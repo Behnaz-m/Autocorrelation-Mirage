@@ -7,6 +7,7 @@
 \usepackage{xcolor}
 \usepackage{enumitem}
 \setlist{nosep,leftmargin=*}
+\providecommand{\texorpdfstring}[2]{#1}
 
 \newcommand{\1}{\mathbf{1}}
 \newcommand{\sigmoid}{\operatorname{logit}^{-1}}
@@ -163,7 +164,8 @@ Normalization leakage required a second DGP with monotone pre-event drift. In th
 
 Figure~\ref{fig:robustness_drift} complements Table~\ref{tab:grid} by making the two supporting patterns visually explicit: the rise in mean $\DeltaCV$ with $\rho$ is concentrated in tree-based learners, and in the drift DGP the largest grouped-CV shift appears for logistic regression under full-trajectory episode normalization.
 
-\section{The DeltaCV Diagnostic}\label{sec:protocol}
+\section{\texorpdfstring{The $\Delta_{\mathrm{CV}}$ Diagnostic and Corrected Protocol}{The DeltaCV Diagnostic and Corrected Protocol}}
+\label{sec:delta-cv-protocol}
 
 We propose a simple diagnostic for split sensitivity under panel expansion:
 
