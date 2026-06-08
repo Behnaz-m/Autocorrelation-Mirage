@@ -98,7 +98,7 @@ Normalization traps are heterogeneous. Simple global standardization $\tilde{X} 
 
 \section{Episode Memorization Under Row-Wise Cross-Validation}\label{sec:pseudo}
 
-Even with leak-free features, standard K-Fold CV inflates performance through \emph{episode memorization}. This is Hurlbert's~\cite{hurlbert1984} pseudoreplication translated to ML: ``replicates are not statistically independent.'' Within-episode observations share: (1)~latent episode effects $\alpha_e$; (2)~autocorrelated features with $\text{Corr}(X_{e,t}, X_{e,t+1}) \gg 0$; (3)~labels determined by the same $T_e$. When row-wise CV places observations from episode $e$ in both training and test sets, the model learns episode-specific patterns---the ``texture'' of each episode's autocorrelation structure. At test time, it performs \textit{identity inference}: recognizing which episode an observation belongs to, then recalling the associated outcome. This transforms forecasting (extrapolation) into interpolation (pattern-matching). As a descriptive design-effect approximation, if each episode contributes approximately $m$ rows and the average within-episode pairwise correlation is $\bar{\rho}$, then
+Even with leak-free features, standard K-Fold CV can inflate performance through \emph{episode memorization} when the target is generalization to unseen episodes. This is Hurlbert's~\cite{hurlbert1984} pseudoreplication translated to ML: ``replicates are not statistically independent.'' Within-episode observations share: (1)~latent episode effects $\alpha_e$; (2)~autocorrelated features with $\text{Corr}(X_{e,t}, X_{e,t+1}) \gg 0$; (3)~labels determined by the same $T_e$. When row-wise CV places observations from episode $e$ in both training and test sets, the model learns episode-specific patterns---the ``texture'' of each episode's autocorrelation structure. At test time, it performs \textit{identity inference}: recognizing which episode an observation belongs to, then recalling the associated outcome. This transforms forecasting (extrapolation) into interpolation (pattern-matching). As a descriptive design-effect approximation, if each episode contributes approximately $m$ rows and the average within-episode pairwise correlation is $\bar{\rho}$, then
 \[
 n_{\text{eff}} \approx \frac{n}{1 + (m-1)\bar{\rho}}.
 \]
@@ -138,7 +138,7 @@ Explicit Leak + Grouped CV & 0.767 $\pm$ 0.056 & 0.228 $\pm$ 0.046 & +0.213 \\
 \label{fig:simulation}
 \end{figure}
 
-Table~\ref{tab:sim} and Figure~\ref{fig:simulation} reveal the central finding: row-wise cross-validation alone can create substantial optimism. Row-wise KFold yields AUC=0.848 from strictly causal features---an absolute AUC gap of 0.294 over grouped CV (AUC=0.554). In this benchmark, explicit $T_e - t$ leakage raises grouped-evaluation AUC by 0.213. Simple global normalization shows no measurable AUC gap because the base DGP is approximately stationary. That row should therefore be read as a conservative stationary benchmark, not as evidence that preprocessing leakage is unimportant. The same benchmark still averages only about 65 effective observations despite roughly 615 at-risk rows, underscoring that row expansion does not create independent evidence.
+Table~\ref{tab:sim} and Figure~\ref{fig:simulation} reveal the central finding: row-wise cross-validation alone can create substantial optimism. Row-wise KFold yields AUC=0.848 from strictly causal features---an absolute AUC gap of 0.294 over grouped CV (AUC=0.554). In this benchmark, explicit $T_e - t$ leakage raises grouped-evaluation AUC by 0.213. Simple global normalization shows no measurable AUC gap because the base DGP is approximately stationary. That row should therefore be read as a conservative stationary benchmark, not as evidence that preprocessing leakage is unimportant. For tree-based learners, simple affine rescaling is also expected to have limited effect; the normalization row is included as a conservative stationary baseline, whereas the drift-DGP experiment illustrates a transform that genuinely uses future within-episode information. The same benchmark still averages only about 65 effective observations despite roughly 615 at-risk rows, underscoring that row expansion does not create independent evidence.
 
 \begin{table}[t]
 \centering
@@ -175,7 +175,14 @@ Figure~\ref{fig:robustness_drift} complements Table~\ref{tab:grid} by making the
 We propose a simple diagnostic for split sensitivity under panel expansion:
 
 \begin{definition}[$\DeltaCV$ Diagnostic]
-$\DeltaCV := \widehat{\text{AUC}}_{\text{row-KFold}} - \widehat{\text{AUC}}_{\text{episode-GroupKFold}}$. Large positive values indicate split sensitivity: the model performs better when test rows are allowed to share episodes with training rows than when entire episodes are held out.
+\[
+\Delta_{\mathrm{CV}}
+=
+\widehat{\mathrm{AUC}}_{\mathrm{row\text{-}KFold}}
+-
+\widehat{\mathrm{AUC}}_{\mathrm{episode\text{-}GroupKFold}}.
+\]
+Large positive values indicate split sensitivity: the model performs better when test rows are allowed to share episodes with training rows than when entire episodes are held out.
 \end{definition}
 
 In our main benchmark, $\DeltaCV = 0.294$. In the robustness grid, logistic regression usually stays near zero, whereas random forests and boosted trees remain well above 0.10 on average and grow with $\rho$. That pattern makes values around 0.05 a useful warning heuristic in our setting, but we do not claim a universal decision threshold. The relevant magnitude will depend on the domain, target definition, dependence strength, and model family. This metric requires no additional data collection---only re-running evaluation with episode-grouped validation instead of row-wise \texttt{KFold}.
