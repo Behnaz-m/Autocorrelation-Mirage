@@ -1,8 +1,8 @@
-\documentclass[acmsmall,nonacm]{acmart}
+\documentclass[runningheads]{llncs}
 
 \usepackage{booktabs}
 \usepackage{amsmath}
-\usepackage{amsthm}
+\usepackage{amssymb}
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{enumitem}
@@ -12,49 +12,39 @@
 \newcommand{\sigmoid}{\operatorname{logit}^{-1}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Var}{\operatorname{Var}}
-\newcommand{\TODO}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
 \newcommand{\DeltaCV}{\Delta_{\text{CV}}}
-
-\newtheorem{theorem}{Theorem}
-\newtheorem{proposition}{Proposition}
-\newtheorem{definition}{Definition}
-
-\settopmatter{printacmref=false}
-\setcopyright{none}
-\renewcommand\footnotetextcopyrightpermission[1]{}
-\pagestyle{plain}
 
 \begin{document}
 
-%\title{The Autocorrelation Mirage: Pseudoreplication Dominates Label Leakage in Panel Forecasting}
-\title{The Autocorrelation Mirage: Evaluation Bias from Pseudoreplication in Rare-Event Panel Forecasting}
+\title{The Autocorrelation Mirage: Dependence-Aware Evaluation for Rare-Event Panel Forecasting}
+\titlerunning{Dependence-Aware Evaluation for Rare-Event Panels}
 
-\author{Behnaz Moradi-Jamei}
-\email{moradibx@jmu.edu}
-\affiliation{\institution{James Madison University}\city{Harrisonburg}\country{USA}}
-\author{Heman Shakeri}
-\email{hs@virginia.edu}
-\affiliation{\institution{University of Virginia}\city{Charlottesville}\country{USA}}
+% Replace XXXX with the METEOR tracking number before submission.
+\author{Paper ID XXXX}
+\authorrunning{Paper ID XXXX}
+\institute{}
 
+\maketitle
 
 \begin{abstract}
-Rare-event forecasting from panel data often expands episodes into daily observations to increase the number of training rows. That reformulation also changes the evaluation problem: row-wise cross-validation can place observations from the same episode in both training and test sets, allowing the model to recognize episode-specific autocorrelation rather than generalize to unseen episodes. We call this mechanism \emph{episode memorization}. We distinguish it from two related problems that are often conflated with it: explicit future-information leakage in features and preprocessing leakage from operations such as global normalization. In a controlled simulation with strictly causal features and an XGBoost classifier, row-wise K-Fold cross-validation inflates mean AUC from 0.56 to 0.86, whereas an explicit time-to-event leak reaches 0.77 under grouped evaluation. We use this discrepancy to motivate $\DeltaCV$, the gap between random and grouped cross-validation estimates, as a practical warning signal rather than a universal decision rule. The paper contributes a compact taxonomy of failure modes, a worked example of row-wise versus grouped splitting, and a corrected evaluation protocol for episode-based rare-event forecasting.
-\end{abstract}
+Trustworthy rare-event forecasting depends on evaluation protocols that respect the dependence structure of panel data. A common workaround for small sample sizes expands episodes into daily observations, but this changes the evaluation problem: row-wise cross-validation can place observations from the same episode in both training and test sets, allowing a model to exploit episode-specific autocorrelation rather than generalize to unseen episodes. We call this mechanism \emph{episode memorization}. We distinguish it from two related problems that are often conflated with it: explicit future-information leakage in features and preprocessing leakage from operations such as global normalization. In a controlled simulation with strictly causal features and an XGBoost classifier, row-wise K-Fold cross-validation inflates mean AUC from 0.56 to 0.86, whereas an explicit time-to-event leak reaches 0.77 under grouped evaluation. We therefore propose $\DeltaCV$, the gap between row-wise and grouped estimates, as a practical warning signal rather than a universal threshold, and we provide a dependence-aware evaluation protocol based on grouped splitting and fold-local preprocessing. The contribution is methodological: a compact taxonomy, a mechanistic explanation, and a low-cost protocol for more trustworthy rare-event panel forecasting.
 
 \keywords{pseudoreplication, cross-validation, panel data, rare events, episode memorization}
-\maketitle
+\end{abstract}
 
 \section{Introduction}
 
-Predicting rare events---coups, equipment failures, patient deterioration---from panel data confronts a sample-size barrier. With 20--50 episodes and 10--20 features, events-per-variable (EPV) ratios fall below 1.0, far short of the 10--20 required for stable inference~\cite{peduzzi1996,vansmeden2016}. A common solution expands each episode into daily rows: 20 episodes become 500+ observations, apparently resolving the problem.
+Trustworthy AI systems depend not only on model capacity, but also on evaluation protocols that match the deployment target. This is especially important in rare-event forecasting from panel data, where the number of independent episodes is small but decisions may still rely on reported predictive accuracy. In domains such as conflict forecasting, clinical deterioration, and predictive maintenance, 20--50 episodes with 10--20 features can yield events-per-variable (EPV) ratios well below conventional stability guidelines~\cite{peduzzi1996,vansmeden2016}. A common workaround expands each episode into daily rows, turning a small set of episodes into hundreds of observations.
 
-This reformulation changes the evaluation problem. When row-wise K-Fold cross-validation assigns expanded observations to folds independently, rows from the same episode can appear in both training and test sets. Because consecutive observations $X_{e,t}$ and $X_{e,t+1}$ are autocorrelated, a flexible model can recognize episode-specific trajectory structure rather than infer risk that transfers to unseen episodes. We call this mechanism \textbf{episode memorization}. In that setting, random row-wise CV turns a forecasting task (generalizing to new episodes) into a partially interpolative task (matching rows within known episodes).
+That expansion does not simply increase sample size; it changes the evaluation problem. When row-wise K-Fold cross-validation assigns expanded observations to folds independently, rows from the same episode can appear in both training and test sets. Because consecutive observations $X_{e,t}$ and $X_{e,t+1}$ are autocorrelated, a flexible model can recognize episode-specific trajectory structure rather than infer risk that transfers to unseen episodes. We call this mechanism \textbf{episode memorization}. In that setting, random row-wise CV turns a forecasting task (generalizing to new episodes) into a partially interpolative task (matching rows within known episodes).
 
 It is useful to distinguish three failure modes that are often conflated. \emph{Explicit leakage} occurs when a feature directly encodes unavailable future information such as $T_e - t$. \emph{Normalization leakage} occurs when preprocessing uses observations that should be unavailable at prediction time. \emph{Pseudoreplication} occurs when dependent rows from the same episode are split across training and test folds. The first two are feature- or preprocessing-level violations. The third is an evaluation-design violation and can arise even when every feature is strictly causal.
 
-In our simulation, replacing grouped evaluation with row-wise \texttt{KFold} inflates mean AUC from 0.56 to 0.86. In the same benchmark, an explicit time-to-event leak reaches 0.77 under grouped evaluation. We present this comparison as evidence that pseudoreplication can be severe, not as a universal ranking across all domains or models. Kaufman et al.~\cite{kaufman2012} formalized data leakage and learn-predict separation in i.i.d.\ settings. Roberts et al.~\cite{roberts2017} argued for block cross-validation for structured data. Hurlbert~\cite{hurlbert1984} coined \emph{pseudoreplication} in experimental design. Kapoor and Narayanan~\cite{kapoor2023} documented leakage across many applied ML papers, and Neunhoeffer and Sternberg~\cite{neunhoeffer2019} showed that cross-validation misuse can overturn substantive forecasting claims. We build on these strands in the specific setting of panel-expanded rare-event forecasting.
+In our simulation, replacing grouped evaluation with row-wise \texttt{KFold} inflates mean AUC from 0.56 to 0.86. In the same benchmark, an explicit time-to-event leak reaches 0.77 under grouped evaluation. We present this comparison as evidence that pseudoreplication can be severe, not as a universal ranking across all domains or models. Kaufman et al.~\cite{kaufman2012} formalized data leakage and learn-predict separation in i.i.d.\ settings. Roberts et al.~\cite{roberts2017} argued for block cross-validation for structured data. Hurlbert~\cite{hurlbert1984} coined \emph{pseudoreplication} in experimental design. Kapoor and Narayanan~\cite{kapoor2023} documented leakage across many applied ML papers, and Neunhoeffer and Sternberg~\cite{neunhoeffer2019} showed that cross-validation misuse can overturn substantive forecasting claims. We build on these strands in the specific setting of panel-expanded rare-event forecasting, where dependence-aware evaluation is both necessary and easy to operationalize.
 
-The paper makes four contributions. First, it clarifies the distinction between explicit leakage, preprocessing leakage, and pseudoreplication in expanded panels. Second, it formalizes episode memorization as the mechanism by which row-wise CV can produce optimistic estimates. Third, it quantifies the resulting optimism in a controlled simulation with strictly causal features. Fourth, it proposes $\DeltaCV$, the gap between random and grouped CV estimates, as a practical warning signal together with a corrected evaluation protocol.
+The paper makes four contributions. First, it clarifies the distinction between explicit leakage, preprocessing leakage, and pseudoreplication in expanded panels. Second, it formalizes episode memorization as the mechanism by which row-wise CV can produce optimistic estimates. Third, it quantifies the resulting optimism in a controlled simulation with strictly causal features. Fourth, it proposes $\DeltaCV$, the gap between row-wise and grouped CV estimates, as a practical warning signal together with a dependence-aware evaluation protocol.
+
+The goal is methodological rather than epidemiological: we identify a failure mode, explain its mechanism, and quantify its potential impact under controlled conditions. Measuring how prevalent this problem is in published practice requires separate large-scale empirical audits.
 
 \section{Theoretical Framework}\label{sec:theory}
 
@@ -95,13 +85,13 @@ Table~\ref{tab:failure_modes} summarizes the three failure modes emphasized in t
 \caption{Three distinct sources of evaluation optimism in expanded panel forecasting.}\label{tab:failure_modes}
 \vspace{-2mm}
 \footnotesize
-\begin{tabular}{@{}p{2.2cm}p{4.1cm}p{1.6cm}p{2.0cm}@{}}
+\begin{tabular}{@{}p{2.15cm}p{4.15cm}p{1.35cm}p{2.15cm}@{}}
 \toprule
-\textbf{Failure mode} & \textbf{Mechanism} & \textbf{Future info in features?} & \textbf{Primary fix} \\
+\textbf{Failure mode} & \textbf{Mechanism} & \textbf{Future info?} & \textbf{Primary fix} \\
 \midrule
-Explicit leakage & Feature directly encodes $T_e - t$ or another post-$t$ outcome signal & Yes & Remove or redesign feature \\
-Normalization leakage & Preprocessing uses global or post-$t$ statistics, so transformed inputs depend on unavailable observations & Indirectly & Fit transformations within training folds or use trailing windows \\
-Pseudoreplication & Row-wise CV splits the same episode across train and test, enabling identity inference from dependence structure & No & Grouped splitting by episode \\
+Explicit leakage & Feature directly encodes a post-$t$ outcome signal such as $T_e - t$ & Yes & Redesign or remove feature \\
+Normalization leakage & Global or post-$t$ statistics enter transformed inputs & Indirectly & Fit transforms within folds or use trailing statistics \\
+Pseudoreplication & The same episode appears in both train and test folds & No & Group by episode at split time \\
 \bottomrule
 \end{tabular}
 \vspace{-3mm}
@@ -112,7 +102,9 @@ Global normalization $\tilde{X} = (X - \mu)/\sigma$ uses statistics from all obs
 \section{Episode Memorization Under Row-Wise Cross-Validation}\label{sec:pseudo}
 
 Even with leak-free features, standard K-Fold CV inflates performance through \emph{episode memorization}. This is Hurlbert's~\cite{hurlbert1984} pseudoreplication translated to ML: ``replicates are not statistically independent.'' Within-episode observations share: (1)~latent episode effects $\alpha_e$; (2)~autocorrelated features with $\text{Corr}(X_{e,t}, X_{e,t+1}) \gg 0$; (3)~labels determined by the same $T_e$. When random CV places observations from episode $e$ in both training and test sets, the model learns episode-specific patterns---the ``texture'' of each episode's autocorrelation structure. At test time, it performs \textit{identity inference}: recognizing which episode an observation belongs to, then recalling the associated outcome. This transforms forecasting (extrapolation) into interpolation (pattern-matching). Under intraclass correlation $\rho$ with $m$ observations per episode:
-$n_{\text{eff}} = \frac{n}{1 + (m-1)\rho}$.
+\[
+n_{\text{eff}} = \frac{n}{1 + (m-1)\rho}.
+\]
 
 A minimal example makes the mechanism concrete. Suppose episodes A, B, and C each contribute two daily rows. A random two-fold split may train on $\{A_1,B_1,C_2\}$ and test on $\{A_2,B_2,C_1\}$; every test row now has a sibling row from the same episode in training. A grouped split instead trains on $\{A_1,A_2,B_1,B_2\}$ and tests on $\{C_1,C_2\}$, forcing prediction to transfer across episodes rather than match within them.
 
@@ -123,11 +115,8 @@ Under within-episode dependence ($\rho > 0$): $\E[\widehat{\text{AUC}}_{\text{ra
 \end{proposition}
 
 \section{Empirical Validation}\label{sec:empirical}
-We generate $E=30$ episodes with: episode effect $\alpha_e \sim \mathcal{N}(0,0.5)$; AR(1) latent process $Z_{e,t} = 0.7 Z_{e,t-1} + \epsilon_t$; hazard $h_{e,t} = \sigmoid(-3 + \alpha_e + 0.15 Z_{e,t})$; features from $Z_{e,<t}$ only (strictly causal); label $Y_{e,t} = \1\{t < T_e \leq t+14\}$.
-The intercept $-3$ yields an approximate $5\%$ base event rate
-($\operatorname{logit}^{-1}(-3)\approx 0.047$), matching empirical rare-event
-frequencies. Features are constructed only from $Z_{e,<t}$ (strictly causal);
-the label is $Y_{e,t}=\1\{\, t < T_e \le t+14 \,\}.$ Each condition is evaluated with the same XGBoost classifier used in the released codebase ($100$ trees, maximum depth $4$, learning rate $0.1$, subsample $0.8$, and colsample-by-tree $0.8$). Grouped evaluation uses leave-one-episode-out validation; the row-wise comparison uses shuffled five-fold \texttt{KFold}. Standardization is fit within each training fold except in the deliberate global-normalization condition. We evaluate four conditions across 100 replicates.
+
+We generate $E=30$ episodes with: episode effect $\alpha_e \sim \mathcal{N}(0,0.5)$; AR(1) latent process $Z_{e,t} = 0.7 Z_{e,t-1} + \epsilon_t$; hazard $h_{e,t} = \sigmoid(-3 + \alpha_e + 0.15 Z_{e,t})$; features from $Z_{e,<t}$ only (strictly causal); label $Y_{e,t} = \1\{t < T_e \leq t+14\}$. The intercept $-3$ yields an approximate $5\%$ base event rate ($\operatorname{logit}^{-1}(-3)\approx 0.047$), matching empirical rare-event frequencies. Features are constructed only from $Z_{e,<t}$ (strictly causal); the label is $Y_{e,t}=\1\{\, t < T_e \le t+14 \,\}.$ Each condition is evaluated with the same XGBoost classifier used in the experimental implementation ($100$ trees, maximum depth $4$, learning rate $0.1$, subsample $0.8$, and colsample-by-tree $0.8$). Grouped evaluation uses leave-one-episode-out validation; the row-wise comparison uses shuffled five-fold \texttt{KFold}. Standardization is fit within each training fold except in the deliberate global-normalization condition. We evaluate four conditions across 100 replicates.
 
 \begin{table}[t]
 \centering
@@ -149,8 +138,7 @@ Explicit Leak + Grouped & 0.77 $\pm$ 0.04 & 0.16 $\pm$ 0.03 & +39\% \\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.7\columnwidth]{figure1_simulation_results.png}
-\Description{Simulation plots comparing grouped and row-wise cross-validation across four experimental conditions, showing inflated AUC and improved but misleading Brier scores under row-wise splitting.}
+\includegraphics[width=0.7\textwidth]{figure1_simulation_results.png}
 \caption{Simulation results (100 replicates). \emph{(A)}~AUC distributions: row-wise random CV inflates performance relative to grouped evaluation. \emph{(B)}~Brier scores show that apparently better calibration under random CV is also optimistic. \emph{(C)}~In this benchmark, pseudoreplication (+54\%) exceeds the explicit leakage condition (+39\%). \emph{(D)}~Under random CV (red), performance decouples from effective sample size: the model achieves AUC $> 0.8$ even when $n_{\text{eff}} < 50$, indicating exploitation of autocorrelation structure rather than transferable signal.}
 \label{fig:simulation}
 \vspace{-6mm}
@@ -160,7 +148,7 @@ Table~\ref{tab:sim} and Figure~\ref{fig:simulation} reveal the central finding: 
 
 Figure~\ref{fig:simulation}D demonstrates that under random CV, performance completely decouples from effective sample size. The model achieves high AUC regardless of $n_{\text{eff}}$, indicating it exploits episode texture rather than learning generalizable signal.
 
-\section{\texorpdfstring{The $\DeltaCV$ Diagnostic}{The DeltaCV Diagnostic}}\label{sec:protocol}
+\section{The DeltaCV Diagnostic}\label{sec:protocol}
 
 We propose a simple diagnostic for episode memorization:
 
@@ -170,18 +158,19 @@ $\DeltaCV := \widehat{\text{AUC}}_{\text{random}} - \widehat{\text{AUC}}_{\text{
 
 In our simulation, $\DeltaCV = 0.30$. For this benchmark, values above roughly $0.05$ were a useful practical warning heuristic, but we do not claim a universal decision threshold. The relevant magnitude will depend on the domain, outcome rarity, dependence strength, and model family. This metric requires no additional data collection---only re-running evaluation with grouped validation instead of row-wise \texttt{KFold}.
 
-\textbf{Corrected Protocol:} (1)~\textit{Preprocessing:} Fit transformations on training fold only; forward-fill imputation; trailing windows. (2)~\textit{Evaluation:} Use \texttt{GroupKFold} with \texttt{groups=episode\_id}; never split episodes across folds. (3)~\textit{Reporting:} Report $\DeltaCV$ and $n_{\text{eff}}$ alongside AUC.
+\textbf{Corrected Protocol:} (1)~\textit{Preprocessing:} fit transformations on training folds only; use forward-fill imputation and trailing windows. (2)~\textit{Evaluation:} use grouped splitting with \texttt{groups=episode\_id}; never split episodes across folds. (3)~\textit{Reporting:} report $\DeltaCV$ and $n_{\text{eff}}$ alongside AUC.
 
 \textbf{Practical warning signs:} large positive $\DeltaCV$; substantial disagreement between row-wise and grouped CV; and unusually strong discrimination despite a very small number of episodes.
 
 \section{Discussion}
+
 The main lesson is not that pseudoreplication is always larger than every other leakage mechanism. Rather, row-wise CV can by itself create severe optimism when expanded rows retain strong episode-specific dependence. This matters because row-wise splitters are convenient defaults in general-purpose ML libraries and can be applied mechanically to expanded panels even when they are inappropriate for the underlying prediction target.
 
 Our study has limitations. The evidence here is simulation-based, uses one model family, and does not establish how prevalent the problem is in published practice. Real-data reanalyses across conflict, clinical, maintenance, and churn datasets are needed to measure how often row-wise CV materially changes substantive conclusions. Our DGP is intentionally conservative for normalization leakage because the synthetic features are stationary; domains with strong pre-event trends may exhibit preprocessing leakage and pseudoreplication simultaneously. We also focus on gradient boosting. Sequence models may have different or additional memorization pathways.
 
 Even with these limitations, the implication for trustworthy evaluation is straightforward. Panel expansion creates value only if validation respects episode boundaries. In our benchmark, replacing grouped evaluation with row-wise K-Fold inflates AUC by 54\% despite strictly causal features. Reporting grouped CV, fold-local preprocessing, $\DeltaCV$, and $n_{\text{eff}}$ would make such optimism easier to detect and easier to discuss transparently in future rare-event forecasting studies.
 
-\bibliographystyle{ACM-Reference-Format}
+\bibliographystyle{splncs04}
 \bibliography{references}
 
 \end{document}
