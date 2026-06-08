@@ -1,0 +1,180 @@
+% =====================================================
+% FOUNDATIONAL PAPERS - The Three Pillars
+% =====================================================
+
+% 1. LEAKAGE FORMALIZATION - Kaufman et al. 2012
+@article{kaufman2012,
+  author = {Kaufman, Shachar and Rosset, Saharon and Perlich, Claudia},
+  title = {Leakage in Data Mining: Formulation, Detection, and Avoidance},
+  journal = {ACM Transactions on Knowledge Discovery from Data},
+  volume = {6},
+  number = {4},
+  pages = {15:1--15:21},
+  year = {2012},
+  publisher = {ACM},
+  note = {Foundational paper defining leakage as ``introduction of information about the data mining target which should not be legitimately available to mine from'' and introducing learn-predict separation framework}
+}
+
+% 2. PSEUDOREPLICATION - Hurlbert 1984
+@article{hurlbert1984,
+  author = {Hurlbert, Stuart H.},
+  title = {Pseudoreplication and the Design of Ecological Field Experiments},
+  journal = {Ecological Monographs},
+  volume = {54},
+  number = {2},
+  pages = {187--211},
+  year = {1984},
+  note = {Canonical paper defining pseudoreplication as ``the use of inferential statistics to test for treatment effects with data from experiments where either treatments are not replicated or replicates are not statistically independent.'' Found 48\% of ecological studies using inferential statistics suffered from this problem}
+}
+
+% 3. BLOCK CROSS-VALIDATION - Roberts et al. 2017
+@article{roberts2017,
+  author = {Roberts, David R. and Bahn, Volker and Ciuti, Simone and Boyce, Mark S. and Elith, Jane and Guillera-Arroita, Gurutzeta and Hauenstein, Severin and Lahoz-Monfort, Jos{\'e} J. and Schr{\"o}der, Boris and Thuiller, Wilfried and Warton, David I. and Wintle, Brendan A. and Hartig, Florian and Dormann, Carsten F.},
+  title = {Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure},
+  journal = {Ecography},
+  volume = {40},
+  number = {8},
+  pages = {913--929},
+  year = {2017},
+  note = {Definitive paper (~2,500 citations) recommending ``block cross-validation be used wherever dependence structures exist in a dataset, even if no correlation structure is visible in the fitted model residuals.''}
+}
+
+% =====================================================
+% REPRODUCIBILITY CRISIS / LEAKAGE SURVEYS
+% =====================================================
+
+% Kapoor & Narayanan 2023 - Major survey
+@article{kapoor2023,
+  author = {Kapoor, Sayash and Narayanan, Arvind},
+  title = {Leakage and the reproducibility crisis in machine-learning-based science},
+  journal = {Patterns},
+  volume = {4},
+  number = {9},
+  pages = {100804},
+  year = {2023},
+  publisher = {Elsevier},
+  note = {Found leakage affects 294+ papers across 17 fields. Introduced 8-type taxonomy of leakage. Showed ML superiority claims in civil war prediction ``disappeared'' after correction}
+}
+
+% =====================================================
+% POLITICAL SCIENCE / CONFLICT FORECASTING
+% =====================================================
+
+% Neunhoeffer & Sternberg 2019 - CV misuse in political science
+@article{neunhoeffer2019,
+  author = {Neunhoeffer, Marcel and Sternberg, Sebastian},
+  title = {How Cross-Validation Can Go Wrong and What to Do About It},
+  journal = {Political Analysis},
+  volume = {27},
+  number = {1},
+  pages = {101--106},
+  year = {2019},
+  note = {Identified ``four different meanings of cross-validation in applied political science'' and showed Muchlinski et al.'s civil war prediction claims could not be reproduced with correct CV}
+}
+
+% Cranmer & Desmarais 2017 - Predictive modeling in political science
+@article{cranmer2017,
+  author = {Cranmer, Skyler J. and Desmarais, Bruce A.},
+  title = {What Can We Learn from Predictive Modeling?},
+  journal = {Political Analysis},
+  volume = {25},
+  number = {2},
+  pages = {145--166},
+  year = {2017},
+  note = {Discusses proper cross-validation procedures when data are organized according to dependence structures such as longitudinal/panel data}
+}
+
+% Muchlinski et al. 2016 - The paper that sparked the replication debate
+@article{muchlinski2016,
+  author = {Muchlinski, David and Siroky, David and He, Jingrui and Kocher, Matthew},
+  title = {Comparing Random Forest with Logistic Regression for Predicting Class-Imbalanced Civil War Onset Data},
+  journal = {Political Analysis},
+  volume = {24},
+  number = {1},
+  pages = {87--103},
+  year = {2016},
+  note = {Claimed RF outperforms logistic regression for civil war prediction; later shown by Neunhoeffer \& Sternberg and Kapoor \& Narayanan to suffer from CV misuse}
+}
+
+% Hegre et al. 2019 - ViEWS conflict forecasting
+@article{hegre2019,
+  author = {Hegre, H{\aa}vard and Allansson, Marie and Basedau, Matthias and Colaresi, Michael and Croicu, Mihai and Fjelde, Hanne and Hoyles, Frederick and Hultman, Lisa and H{\"o}gbladh, Stina and Pettersson, Therese and others},
+  title = {{ViEWS}: A political violence early-warning system},
+  journal = {Journal of Peace Research},
+  volume = {56},
+  number = {2},
+  pages = {155--174},
+  year = {2019}
+}
+
+% =====================================================
+% STATISTICAL FOUNDATIONS
+% =====================================================
+
+% Events per variable
+@article{peduzzi1996,
+  author = {Peduzzi, Peter and Concato, John and Kemper, Elizabeth and Holford, Theodore R. and Feinstein, Alvan R.},
+  title = {A simulation study of the number of events per variable in logistic regression analysis},
+  journal = {Journal of Clinical Epidemiology},
+  volume = {49},
+  number = {12},
+  pages = {1373--1379},
+  year = {1996}
+}
+
+@article{vansmeden2016,
+  author = {van Smeden, Maarten and de Groot, Joris A. H. and Moons, Karel G. M. and Riley, Richard D. and Collins, Gary S. and Altman, Douglas G.},
+  title = {Recommendations for minimum sample sizes in logistic regression},
+  journal = {BMC Medical Research Methodology},
+  volume = {16},
+  pages = {165},
+  year = {2016}
+}
+
+% Purged CV for financial applications
+@book{prado2018,
+  author = {de Prado, Marcos L{\'o}pez},
+  title = {Advances in Financial Machine Learning},
+  publisher = {Wiley},
+  year = {2018},
+  note = {Introduced purged cross-validation with embargo periods to prevent leakage in time-series financial data}
+}
+
+% =====================================================
+% DOMAIN-SPECIFIC APPLICATIONS
+% =====================================================
+
+% Clinical prediction
+@article{rajkomar2018,
+  author = {Rajkomar, Alvin and Oren, Eyal and Chen, Kai and Dai, Andrew M. and Hajaj, Nissan and Hardt, Michaela and Liu, Peter J. and Liu, Xiaobing and Marcus, Jake and Sun, Mimi and others},
+  title = {Scalable and accurate deep learning with electronic health records},
+  journal = {npj Digital Medicine},
+  volume = {1},
+  number = {1},
+  pages = {18},
+  year = {2018}
+}
+
+% =====================================================
+% ADDITIONAL METHODOLOGICAL REFERENCES
+% =====================================================
+
+% Effective sample size / Design effect
+@article{kish1965,
+  author = {Kish, Leslie},
+  title = {Survey Sampling},
+  publisher = {Wiley},
+  year = {1965},
+  note = {Classic reference for design effect and effective sample size under clustering}
+}
+
+% Intraclass correlation
+@article{shrout1979,
+  author = {Shrout, Patrick E. and Fleiss, Joseph L.},
+  title = {Intraclass correlations: Uses in assessing rater reliability},
+  journal = {Psychological Bulletin},
+  volume = {86},
+  number = {2},
+  pages = {420--428},
+  year = {1979}
+}
