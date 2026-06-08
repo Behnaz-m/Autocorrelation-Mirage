@@ -30,6 +30,7 @@ def generate_single_episode(
     hazard_coef: float,
     base_hazard: float,
     horizon: int,
+    drift_strength: float,
     rng: np.random.Generator
 ) -> pd.DataFrame:
     """
@@ -53,6 +54,8 @@ def generate_single_episode(
         Baseline hazard rate (intercept in logit scale)
     horizon : int
         Forecast horizon H (days)
+    drift_strength : float
+        Strength of a monotone deterioration trend over calendar time.
     rng : np.random.Generator
         Random number generator for reproducibility
 
@@ -76,8 +79,12 @@ def generate_single_episode(
     for t in range(1, T_max):
         Z[t] = ar_coef * Z[t-1] + rng.normal(0, noise_std)
 
+    # Add a monotone deterioration component to create optional pre-event drift.
+    deterioration = drift_strength * np.linspace(0, 1, T_max)
+    Z_signal = Z + deterioration
+
     # Compute hazard at each time point
-    hazard = sigmoid(base_hazard + alpha_e + hazard_coef * Z)
+    hazard = sigmoid(base_hazard + alpha_e + hazard_coef * Z_signal)
 
     # Sample event time from discrete hazard
     T_e = T_max + 1  # Default: censored (no event)
@@ -89,32 +96,32 @@ def generate_single_episode(
     # Determine actual episode length
     episode_length = min(T_e, T_max)
 
-    # Create features (STRICTLY CAUSAL - only use Z_{<t})
+    # Create features (STRICTLY CAUSAL - only use observed signal at times < t)
     # Feature 1: Lagged latent value
     X_1 = np.zeros(episode_length)
-    X_1[1:] = Z[:episode_length-1]  # X_1[t] = Z[t-1]
+    X_1[1:] = Z_signal[:episode_length-1]  # X_1[t] = Z_signal[t-1]
 
     # Feature 2: Rolling mean of past 3 values
     X_2 = np.zeros(episode_length)
     for t in range(episode_length):
         if t >= 3:
-            X_2[t] = np.mean(Z[t-3:t])  # Mean of Z[t-3], Z[t-2], Z[t-1]
+            X_2[t] = np.mean(Z_signal[t-3:t])
         elif t > 0:
-            X_2[t] = np.mean(Z[:t])
+            X_2[t] = np.mean(Z_signal[:t])
 
     # Feature 3: Rolling std of past 5 values
     X_3 = np.zeros(episode_length)
     for t in range(episode_length):
         if t >= 5:
-            X_3[t] = np.std(Z[t-5:t])
+            X_3[t] = np.std(Z_signal[t-5:t])
         elif t > 1:
-            X_3[t] = np.std(Z[:t])
+            X_3[t] = np.std(Z_signal[:t])
 
     # Feature 4: Trend (difference from 5 periods ago)
     X_4 = np.zeros(episode_length)
     for t in range(episode_length):
         if t >= 5:
-            X_4[t] = Z[t-1] - Z[t-5]  # Use lagged values only
+            X_4[t] = Z_signal[t-1] - Z_signal[t-5]  # Use lagged values only
 
     # Feature 5: Episode-level static feature (known at t=0)
     X_5 = np.full(episode_length, alpha_e + rng.normal(0, 0.1))
@@ -143,7 +150,7 @@ def generate_single_episode(
     df = pd.DataFrame({
         'episode_id': episode_id,
         't': t_values,
-        'Z': Z[:episode_length],  # For diagnostics only
+        'Z': Z_signal[:episode_length],  # Observed latent signal for diagnostics
         'X_1': X_1,
         'X_2': X_2,
         'X_3': X_3,
@@ -166,6 +173,7 @@ def generate_panel_data(
     base_hazard: float = -3.0,
     alpha_std: float = 0.5,
     horizon: int = 14,
+    drift_strength: float = 0.0,
     seed: int = 42
 ) -> pd.DataFrame:
     """
@@ -189,6 +197,8 @@ def generate_panel_data(
         Standard deviation of episode random effects
     horizon : int
         Forecast horizon (days)
+    drift_strength : float
+        Strength of a monotone deterioration trend over calendar time.
     seed : int
         Random seed for reproducibility
 
@@ -214,6 +224,7 @@ def generate_panel_data(
             hazard_coef=hazard_coef,
             base_hazard=base_hazard,
             horizon=horizon,
+            drift_strength=drift_strength,
             rng=rng
         )
         episodes.append(episode_df)
@@ -227,6 +238,50 @@ def generate_panel_data(
 def get_feature_columns(df: pd.DataFrame) -> list:
     """Return list of feature column names."""
     return [col for col in df.columns if col.startswith('X_')]
+
+
+def add_noise_features(
+    df: pd.DataFrame,
+    total_features: int,
+    seed: int = 42
+) -> pd.DataFrame:
+    """
+    Augment the panel with independent nuisance features.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input panel data containing the base X_1,...,X_5 features.
+    total_features : int
+        Desired total number of feature columns. Must be at least the current
+        number of features.
+    seed : int
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    pd.DataFrame
+        Data with additional columns X_6, X_7, ... if requested.
+    """
+    df = df.copy()
+    feature_cols = get_feature_columns(df)
+
+    if total_features < len(feature_cols):
+        raise ValueError(
+            f"total_features={total_features} is smaller than the existing "
+            f"{len(feature_cols)} features."
+        )
+
+    n_extra = total_features - len(feature_cols)
+    if n_extra == 0:
+        return df
+
+    rng = np.random.default_rng(seed)
+    for feature_idx in range(n_extra):
+        col_name = f"X_{len(feature_cols) + feature_idx + 1}"
+        df[col_name] = rng.normal(0, 1, len(df))
+
+    return df
 
 
 def prepare_modeling_data(

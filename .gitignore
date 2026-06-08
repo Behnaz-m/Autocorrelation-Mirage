@@ -35,3 +35,11 @@ slurm_logs/*.err
 
 # Large result files (keep structure)
 # results/simulation_results_*.csv
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+missfont.log

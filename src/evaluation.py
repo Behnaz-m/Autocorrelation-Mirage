@@ -10,6 +10,9 @@ This module provides:
 
 import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator, clone
+from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import LeaveOneGroupOut, KFold, GroupKFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
@@ -21,33 +24,103 @@ from sklearn.metrics import (
     average_precision_score
 )
 from sklearn.calibration import calibration_curve
-from xgboost import XGBClassifier
 from typing import Tuple, List, Dict, Optional, Callable
 from tqdm import tqdm
 import warnings
 
+try:
+    from xgboost import XGBClassifier
+    HAS_XGBOOST = True
+except ImportError:
+    XGBClassifier = None
+    HAS_XGBOOST = False
 
-def get_default_model() -> XGBClassifier:
-    """Return default XGBoost classifier with reasonable hyperparameters."""
-    return XGBClassifier(
-        n_estimators=100,
+
+def get_default_model(seed: int = 42) -> BaseEstimator:
+    """Return the default boosted-tree model for experiments."""
+    if HAS_XGBOOST:
+        return XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            random_state=seed,
+            use_label_encoder=False,
+            eval_metric='logloss',
+            verbosity=0
+        )
+
+    return HistGradientBoostingClassifier(
         max_depth=4,
         learning_rate=0.1,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        random_state=42,
-        use_label_encoder=False,
-        eval_metric='logloss',
-        verbosity=0
+        max_iter=100,
+        random_state=seed
     )
+
+
+def get_logistic_regression_model(seed: int = 42) -> LogisticRegression:
+    """Return a regularized logistic-regression baseline."""
+    return LogisticRegression(
+        penalty='l2',
+        C=1.0,
+        solver='lbfgs',
+        max_iter=1000,
+        random_state=seed
+    )
+
+
+def get_random_forest_model(seed: int = 42) -> RandomForestClassifier:
+    """Return a random-forest baseline."""
+    return RandomForestClassifier(
+        n_estimators=200,
+        max_depth=None,
+        min_samples_leaf=2,
+        random_state=seed,
+        n_jobs=-1
+    )
+
+
+def create_model(model_name: str, seed: int = 42) -> BaseEstimator:
+    """Create a model by name for robustness experiments."""
+    model_name = model_name.lower()
+    if model_name == 'xgboost':
+        return get_default_model(seed=seed)
+    if model_name == 'logistic':
+        return get_logistic_regression_model(seed=seed)
+    if model_name == 'random_forest':
+        return get_random_forest_model(seed=seed)
+    raise ValueError(f"Unknown model_name: {model_name}")
+
+
+def get_model_display_name(model_name: str) -> str:
+    """Return a display label for a model identifier."""
+    return {
+        'xgboost': 'XGBoost' if HAS_XGBOOST else 'Boosted Trees',
+        'logistic': 'Logistic Regression',
+        'random_forest': 'Random Forest'
+    }.get(model_name, model_name)
+
+
+def _fit_predict_proba(
+    model: BaseEstimator,
+    X_train: np.ndarray,
+    y_train: np.ndarray,
+    X_test: np.ndarray
+) -> np.ndarray:
+    """Fit a fresh clone and return positive-class probabilities."""
+    fold_model = clone(model)
+    fold_model.fit(X_train, y_train)
+    return fold_model.predict_proba(X_test)[:, 1]
 
 
 def evaluate_grouped_cv(
     X: np.ndarray,
     y: np.ndarray,
     groups: np.ndarray,
-    model: Optional[XGBClassifier] = None,
-    normalize_per_fold: bool = True
+    model: Optional[BaseEstimator] = None,
+    normalize_per_fold: bool = True,
+    n_splits: Optional[int] = None
 ) -> pd.DataFrame:
     """
     Evaluate using leave-one-episode-out cross-validation (CORRECT).
@@ -65,23 +138,29 @@ def evaluate_grouped_cv(
         Labels
     groups : np.ndarray
         Episode IDs
-    model : XGBClassifier, optional
+    model : BaseEstimator, optional
         Model to use (default: XGBoost)
     normalize_per_fold : bool
         Whether to normalize within each fold
+    n_splits : int, optional
+        If provided, use GroupKFold with this many splits; otherwise use
+        leave-one-group-out validation.
 
     Returns
     -------
     pd.DataFrame
-        Per-episode results with columns: episode_id, auc, brier, n_obs, n_pos
+        Per-fold results with columns including fold, auc, brier, n_obs, n_pos,
+        and n_test_groups.
     """
     if model is None:
         model = get_default_model()
 
-    logo = LeaveOneGroupOut()
+    splitter = LeaveOneGroupOut() if n_splits is None else GroupKFold(
+        n_splits=min(n_splits, len(np.unique(groups)))
+    )
     results = []
 
-    for train_idx, test_idx in logo.split(X, y, groups):
+    for fold_idx, (train_idx, test_idx) in enumerate(splitter.split(X, y, groups)):
         X_train, X_test = X[train_idx], X[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
@@ -91,29 +170,27 @@ def evaluate_grouped_cv(
             X_train = scaler.fit_transform(X_train)
             X_test = scaler.transform(X_test)
 
-        # Clone model for fresh training
-        fold_model = get_default_model()
-
         # Handle case where test set has only one class
         if len(np.unique(y_test)) < 2:
             # Can't compute AUC with single class
             auc = np.nan
+            y_prob = _fit_predict_proba(model, X_train, y_train, X_test)
         else:
-            fold_model.fit(X_train, y_train)
-            y_prob = fold_model.predict_proba(X_test)[:, 1]
+            y_prob = _fit_predict_proba(model, X_train, y_train, X_test)
             auc = roc_auc_score(y_test, y_prob)
 
         # Brier score can always be computed
-        fold_model.fit(X_train, y_train)
-        y_prob = fold_model.predict_proba(X_test)[:, 1]
         brier = brier_score_loss(y_test, y_prob)
 
+        test_groups = np.unique(groups[test_idx])
         results.append({
-            'episode_id': groups[test_idx[0]],
+            'fold': fold_idx,
+            'episode_id': test_groups[0] if len(test_groups) == 1 else np.nan,
             'auc': auc,
             'brier': brier,
             'n_obs': len(y_test),
             'n_pos': y_test.sum(),
+            'n_test_groups': len(test_groups),
             'y_prob': y_prob,
             'y_true': y_test
         })
@@ -125,7 +202,7 @@ def evaluate_random_cv(
     X: np.ndarray,
     y: np.ndarray,
     n_splits: int = 5,
-    model: Optional[XGBClassifier] = None,
+    model: Optional[BaseEstimator] = None,
     normalize_before: bool = True,
     seed: int = 42
 ) -> pd.DataFrame:
@@ -144,7 +221,7 @@ def evaluate_random_cv(
         Labels
     n_splits : int
         Number of CV folds
-    model : XGBClassifier, optional
+    model : BaseEstimator, optional
         Model to use
     normalize_before : bool
         If True, normalize on ALL data before CV (adds leakage)
@@ -178,11 +255,12 @@ def evaluate_random_cv(
             X_train = scaler.fit_transform(X_train)
             X_test = scaler.transform(X_test)
 
-        fold_model = get_default_model()
-        fold_model.fit(X_train, y_train)
-        y_prob = fold_model.predict_proba(X_test)[:, 1]
+        if len(np.unique(y_train)) < 2:
+            y_prob = np.full(len(y_test), y_train[0], dtype=float)
+        else:
+            y_prob = _fit_predict_proba(model, X_train, y_train, X_test)
 
-        auc = roc_auc_score(y_test, y_prob)
+        auc = np.nan if len(np.unique(y_test)) < 2 else roc_auc_score(y_test, y_prob)
         brier = brier_score_loss(y_test, y_prob)
 
         results.append({

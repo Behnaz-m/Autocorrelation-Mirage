@@ -99,6 +99,39 @@ def apply_global_normalization(
     return df, scaler
 
 
+def apply_episodewise_normalization(
+    df: pd.DataFrame,
+    feature_cols: list
+) -> pd.DataFrame:
+    """
+    Apply WRONG episode-wise normalization using each full trajectory.
+
+    This uses future observations within the same episode when centering and
+    scaling each row, which is unavailable at prediction time.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Input data
+    feature_cols : list
+        Columns to normalize
+
+    Returns
+    -------
+    pd.DataFrame
+        Data with episode-normalized columns named X_k_epinorm
+    """
+    df = df.copy()
+
+    for col in feature_cols:
+        group_mean = df.groupby('episode_id')[col].transform('mean')
+        group_std = df.groupby('episode_id')[col].transform('std').replace(0, 1)
+        group_std = group_std.fillna(1)
+        df[f'{col}_epinorm'] = (df[col] - group_mean) / group_std
+
+    return df
+
+
 def apply_rolling_normalization(
     df: pd.DataFrame,
     feature_cols: list,
