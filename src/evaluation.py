@@ -25,7 +25,11 @@ from sklearn.metrics import (
 )
 from sklearn.calibration import calibration_curve
 from typing import Tuple, List, Dict, Optional, Callable
-from tqdm import tqdm
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, **_: object):
+        return iterable
 import warnings
 
 try:

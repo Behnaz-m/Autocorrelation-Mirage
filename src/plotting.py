@@ -79,8 +79,8 @@ def plot_auc_comparison_bars(
 
     condition_labels = {
         'leak_free_grouped': 'Leak-Free\n+ Grouped CV',
-        'leak_free_random': 'Leak-Free\n+ Random CV',
-        'norm_leak_grouped': 'Normalization\nLeak',
+        'leak_free_random': 'Leak-Free\n+ Row-wise KFold',
+        'norm_leak_grouped': 'Global Norm.\n+ Grouped CV',
         'explicit_leak_grouped': 'Explicit\nLeak'
     }
 
@@ -115,14 +115,11 @@ def plot_auc_comparison_bars(
     ax.set_xticks(x_pos)
     ax.set_xticklabels([condition_labels[c] for c in condition_order])
     ax.set_ylabel('AUC-ROC')
-    ax.set_ylim(0.4, 1.05)
+    ax.set_ylim(0.45, 0.95)
     ax.set_title('Impact of Leakage and CV Method on Reported AUC')
 
-    # Add reference lines
-    ax.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5, label='Random classifier')
-    ax.axhline(y=0.97, color='red', linestyle=':', alpha=0.5, label='Typical "high" reported AUC')
-
-    ax.legend(loc='lower right')
+    # Chance-performance reference
+    ax.axhline(y=0.5, color='gray', linestyle='--', alpha=0.5)
 
     plt.tight_layout()
 
@@ -164,7 +161,7 @@ def plot_four_panel_simulation(
 
     condition_labels = {
         'leak_free_grouped': 'Baseline\n(Correct)',
-        'leak_free_random': 'Random CV\n(Pseudorep.)',
+        'leak_free_random': 'Row-wise KFold\n(Pseudorep.)',
         'norm_leak_grouped': 'Norm. Leak',
         'explicit_leak_grouped': 'Explicit Leak'
     }
