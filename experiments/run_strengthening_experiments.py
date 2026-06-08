@@ -33,6 +33,7 @@ from src.data_generation import (
     prepare_modeling_data,
 )
 from src.evaluation import (
+    compute_pooled_oof_metrics,
     compute_effective_sample_size,
     create_model,
     evaluate_grouped_cv,
@@ -98,14 +99,16 @@ def evaluate_panel(
     )
     n, m, rho_hat, n_eff = compute_effective_sample_size(groups, y)
 
-    grouped_auc = grouped_res["auc"].dropna().mean()
-    random_auc = random_res["auc"].dropna().mean()
+    grouped_metrics = compute_pooled_oof_metrics(grouped_res)
+    random_metrics = compute_pooled_oof_metrics(random_res)
+    grouped_auc = grouped_metrics["auc"]
+    random_auc = random_metrics["auc"]
 
     return {
         "grouped_auc": grouped_auc,
-        "grouped_brier": grouped_res["brier"].mean(),
+        "grouped_brier": grouped_metrics["brier"],
         "random_auc": random_auc,
-        "random_brier": random_res["brier"].mean(),
+        "random_brier": random_metrics["brier"],
         "delta_cv": random_auc - grouped_auc,
         "event_rate": y.mean(),
         "n_obs": len(y),
@@ -205,9 +208,10 @@ def grouped_auc_only(
         normalize_per_fold=normalize_per_fold,
         n_splits=grouped_splits,
     )
+    pooled_metrics = compute_pooled_oof_metrics(grouped_res)
     return {
-        "auc": grouped_res["auc"].dropna().mean(),
-        "brier": grouped_res["brier"].mean(),
+        "auc": pooled_metrics["auc"],
+        "brier": pooled_metrics["brier"],
         "event_rate": y.mean(),
         "n_obs": len(y),
     }

@@ -1,0 +1,10 @@
+model_label,condition,drift_strength,auc_mean,auc_std,brier_mean
+Boosted Trees,episode_norm,1.0,0.625,0.024,0.255
+Boosted Trees,global_norm,1.0,0.676,0.036,0.265
+Boosted Trees,leak_free,1.0,0.676,0.036,0.265
+Logistic Regression,episode_norm,1.0,0.606,0.004,0.242
+Logistic Regression,global_norm,1.0,0.473,0.064,0.265
+Logistic Regression,leak_free,1.0,0.473,0.064,0.265
+Random Forest,episode_norm,1.0,0.586,0.053,0.25
+Random Forest,global_norm,1.0,0.546,0.04,0.302
+Random Forest,leak_free,1.0,0.546,0.04,0.302

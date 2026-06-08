@@ -114,6 +114,45 @@ def _fit_predict_proba(
     return fold_model.predict_proba(X_test)[:, 1]
 
 
+def collect_oof_predictions(results: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Concatenate out-of-fold labels and probabilities across folds.
+
+    Parameters
+    ----------
+    results : pd.DataFrame
+        Output from evaluate_grouped_cv or evaluate_random_cv containing y_true
+        and y_prob arrays for each fold.
+
+    Returns
+    -------
+    y_true : np.ndarray
+        Concatenated true labels.
+    y_prob : np.ndarray
+        Concatenated out-of-fold predicted probabilities.
+    """
+    y_true = np.concatenate(results['y_true'].to_numpy()) if len(results) else np.array([])
+    y_prob = np.concatenate(results['y_prob'].to_numpy()) if len(results) else np.array([])
+    return y_true, y_prob
+
+
+def compute_pooled_oof_metrics(results: pd.DataFrame) -> Dict[str, float]:
+    """
+    Compute pooled metrics from out-of-fold predictions.
+
+    This avoids averaging fold-level AUCs and avoids dropping folds with only one
+    class as long as the pooled out-of-fold predictions contain both classes.
+    """
+    y_true, y_prob = collect_oof_predictions(results)
+
+    if len(y_true) == 0:
+        return {'auc': np.nan, 'brier': np.nan, 'n_obs': 0}
+
+    auc = np.nan if len(np.unique(y_true)) < 2 else roc_auc_score(y_true, y_prob)
+    brier = brier_score_loss(y_true, y_prob)
+    return {'auc': auc, 'brier': brier, 'n_obs': len(y_true)}
+
+
 def evaluate_grouped_cv(
     X: np.ndarray,
     y: np.ndarray,
@@ -268,7 +307,9 @@ def evaluate_random_cv(
             'auc': auc,
             'brier': brier,
             'n_obs': len(y_test),
-            'n_pos': y_test.sum()
+            'n_pos': y_test.sum(),
+            'y_prob': y_prob,
+            'y_true': y_test
         })
 
     return pd.DataFrame(results)
@@ -399,35 +440,37 @@ def aggregate_results(
     dict
         Summary statistics for both methods
     """
-    # Grouped CV results (correct)
+    # Grouped and random CV results from pooled out-of-fold predictions
+    grouped_pooled = compute_pooled_oof_metrics(grouped_results)
+    random_pooled = compute_pooled_oof_metrics(random_results)
+
     grouped_auc = grouped_results['auc'].dropna()
     grouped_mean, grouped_ci_low, grouped_ci_high = episode_bootstrap_ci(grouped_auc.values)
-
     grouped_brier = grouped_results['brier'].values
     brier_mean, brier_ci_low, brier_ci_high = episode_bootstrap_ci(grouped_brier)
 
-    # Random CV results (wrong)
-    random_auc_mean = random_results['auc'].mean()
-    random_auc_std = random_results['auc'].std()
-    random_brier_mean = random_results['brier'].mean()
-
     return {
         'grouped_cv': {
-            'auc_mean': grouped_mean,
+            'auc_mean': grouped_pooled['auc'],
+            'auc_fold_mean': grouped_mean,
             'auc_ci': (grouped_ci_low, grouped_ci_high),
-            'brier_mean': brier_mean,
+            'brier_mean': grouped_pooled['brier'],
+            'brier_fold_mean': brier_mean,
             'brier_ci': (brier_ci_low, brier_ci_high),
             'n_episodes': len(grouped_results)
         },
         'random_cv': {
-            'auc_mean': random_auc_mean,
-            'auc_std': random_auc_std,
-            'brier_mean': random_brier_mean,
+            'auc_mean': random_pooled['auc'],
+            'auc_std': random_results['auc'].std(),
+            'brier_mean': random_pooled['brier'],
             'n_folds': len(random_results)
         },
         'inflation': {
-            'auc_absolute': random_auc_mean - grouped_mean,
-            'auc_relative': (random_auc_mean - grouped_mean) / grouped_mean * 100 if grouped_mean > 0 else np.nan
+            'auc_absolute': random_pooled['auc'] - grouped_pooled['auc'],
+            'auc_relative': (
+                (random_pooled['auc'] - grouped_pooled['auc']) / grouped_pooled['auc'] * 100
+                if grouped_pooled['auc'] > 0 else np.nan
+            )
         }
     }
 

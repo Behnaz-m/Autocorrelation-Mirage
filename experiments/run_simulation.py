@@ -34,6 +34,7 @@ from src.leakage_injection import (
     apply_global_normalization
 )
 from src.evaluation import (
+    compute_pooled_oof_metrics,
     evaluate_grouped_cv,
     evaluate_random_cv,
     compute_effective_sample_size
@@ -77,9 +78,10 @@ def run_single_replicate(seed: int, verbose: bool = False) -> dict:
     X, y, groups = prepare_modeling_data(df, feature_cols)
 
     # Grouped CV (correct)
-    grouped_res = evaluate_grouped_cv(X, y, groups)
-    auc_grouped = grouped_res['auc'].dropna().mean()
-    brier_grouped = grouped_res['brier'].mean()
+    grouped_res = evaluate_grouped_cv(X, y, groups, n_splits=5)
+    grouped_metrics = compute_pooled_oof_metrics(grouped_res)
+    auc_grouped = grouped_metrics['auc']
+    brier_grouped = grouped_metrics['brier']
 
     results['leak_free_grouped'] = {
         'auc': auc_grouped,
@@ -89,8 +91,9 @@ def run_single_replicate(seed: int, verbose: bool = False) -> dict:
 
     # ====== CONDITION 2: Leak-Free + Random CV (Pseudoreplication) ======
     random_res = evaluate_random_cv(X, y, normalize_before=True, seed=seed)
-    auc_random = random_res['auc'].mean()
-    brier_random = random_res['brier'].mean()
+    random_metrics = compute_pooled_oof_metrics(random_res)
+    auc_random = random_metrics['auc']
+    brier_random = random_metrics['brier']
 
     results['leak_free_random'] = {
         'auc': auc_random,
@@ -104,9 +107,16 @@ def run_single_replicate(seed: int, verbose: bool = False) -> dict:
     X_norm, y_norm, groups_norm = prepare_modeling_data(df_norm, norm_cols)
 
     # Use grouped CV but with leaked features
-    grouped_res_norm = evaluate_grouped_cv(X_norm, y_norm, groups_norm, normalize_per_fold=False)
-    auc_norm = grouped_res_norm['auc'].dropna().mean()
-    brier_norm = grouped_res_norm['brier'].mean()
+    grouped_res_norm = evaluate_grouped_cv(
+        X_norm,
+        y_norm,
+        groups_norm,
+        normalize_per_fold=False,
+        n_splits=5
+    )
+    norm_metrics = compute_pooled_oof_metrics(grouped_res_norm)
+    auc_norm = norm_metrics['auc']
+    brier_norm = norm_metrics['brier']
 
     results['norm_leak_grouped'] = {
         'auc': auc_norm,
@@ -119,9 +129,10 @@ def run_single_replicate(seed: int, verbose: bool = False) -> dict:
     leak_cols = feature_cols + ['X_leak']
     X_leak, y_leak, groups_leak = prepare_modeling_data(df_leak, leak_cols)
 
-    grouped_res_leak = evaluate_grouped_cv(X_leak, y_leak, groups_leak)
-    auc_leak = grouped_res_leak['auc'].dropna().mean()
-    brier_leak = grouped_res_leak['brier'].mean()
+    grouped_res_leak = evaluate_grouped_cv(X_leak, y_leak, groups_leak, n_splits=5)
+    leak_metrics = compute_pooled_oof_metrics(grouped_res_leak)
+    auc_leak = leak_metrics['auc']
+    brier_leak = leak_metrics['brier']
 
     results['explicit_leak_grouped'] = {
         'auc': auc_leak,
