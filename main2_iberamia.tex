@@ -164,7 +164,7 @@ Normalization leakage required a second DGP with monotone pre-event drift. In th
 
 Figure~\ref{fig:robustness_drift} complements Table~\ref{tab:grid} by making the two supporting patterns visually explicit: the rise in mean $\DeltaCV$ with $\rho$ is concentrated in tree-based learners, and in the drift DGP the largest grouped-CV shift appears for logistic regression under full-trajectory episode normalization.
 
-\section{\texorpdfstring{The $\Delta_{\mathrm{CV}}$ Diagnostic and Corrected Protocol}{The DeltaCV Diagnostic and Corrected Protocol}}
+\section{\texorpdfstring{The $\Delta_{\mathrm{CV}}$ Diagnostic and Dependence-Aware Evaluation Protocol}{The DeltaCV Diagnostic and Dependence-Aware Evaluation Protocol}}
 \label{sec:delta-cv-protocol}
 
 We propose a simple diagnostic for split sensitivity under panel expansion:
@@ -183,7 +183,7 @@ Large positive values indicate split sensitivity: the model performs better when
 
 In our main benchmark, $\DeltaCV = 0.294$. In the robustness grid, logistic regression usually stays near zero, whereas random forests and boosted trees remain well above 0.10 on average and grow with $\rho$. That pattern makes values around 0.05 a useful warning heuristic in our setting, but we do not claim a universal decision threshold. The relevant magnitude will depend on the domain, target definition, dependence strength, and model family. This metric requires no additional data collection---only re-running evaluation with episode-grouped validation instead of row-wise \texttt{KFold}.
 
-\textbf{Corrected Protocol:} (1)~\textit{Preprocessing:} fit transformations on training folds only; use forward-fill imputation and trailing windows. (2)~\textit{Evaluation:} use grouped splitting with \texttt{groups=episode\_id}; never split episodes across folds. (3)~\textit{Reporting:} report $\DeltaCV$ and $n_{\text{eff}}$ alongside AUC.
+\textbf{Dependence-Aware Evaluation Protocol:} (1)~\textit{Preprocessing:} fit transformations on training folds only; use forward-fill imputation and trailing windows. (2)~\textit{Evaluation:} use grouped splitting with \texttt{groups=episode\_id}; never split episodes across folds. (3)~\textit{Reporting:} report $\DeltaCV$ and $n_{\text{eff}}$ alongside AUC.
 
 \textbf{Specificity and failure modes:} a large positive $\DeltaCV$ is a warning flag, not a proof of episode memorization. Distribution shift between grouped folds, severe fold imbalance, episode heterogeneity, or a mismatch between row-wise interpolation and the true deployment target can also enlarge the gap. Near-zero gaps can likewise be false negatives when dependence is weak or model capacity is limited, as illustrated by the logistic-regression cells in Table~\ref{tab:grid}. Practical warning signs are therefore: large positive $\DeltaCV$; substantial disagreement between row-wise and grouped CV; and unusually strong discrimination despite a very small number of episodes.
 
