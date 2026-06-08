@@ -432,6 +432,119 @@ def plot_inflation_heatmap(
     return fig
 
 
+def plot_robustness_drift_companion(
+    robustness_summary_df: pd.DataFrame,
+    drift_summary_df: pd.DataFrame,
+    output_path: Optional[str] = None,
+    figsize: Tuple[float, float] = (9, 3.8)
+) -> plt.Figure:
+    """
+    Create a compact two-panel figure for the LNCS submission.
+
+    Left panel:
+        Mean DeltaCV by dependence level for each model family,
+        averaging over episode count and feature dimensionality.
+
+    Right panel:
+        Grouped-CV AUC in the drift DGP comparing leak-free inputs
+        with full-trajectory episode normalization.
+    """
+    setup_figure_style()
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
+    model_order = ['Logistic Regression', 'Random Forest', 'Boosted Trees']
+    model_colors = {
+        'Logistic Regression': '#1f77b4',
+        'Random Forest': '#2ca02c',
+        'Boosted Trees': '#d62728',
+    }
+
+    ax = axes[0]
+    robustness_plot = (
+        robustness_summary_df
+        .groupby(['model_label', 'ar_coef'], as_index=False)['delta_cv_mean']
+        .mean()
+        .sort_values(['model_label', 'ar_coef'])
+    )
+
+    for model_label in model_order:
+        subset = robustness_plot[robustness_plot['model_label'] == model_label]
+        if subset.empty:
+            continue
+        ax.plot(
+            subset['ar_coef'],
+            subset['delta_cv_mean'],
+            marker='o',
+            linewidth=2,
+            markersize=5,
+            color=model_colors[model_label],
+            label=model_label,
+        )
+
+    ax.set_title('Robustness Across Dependence')
+    ax.set_xlabel(r'Dependence level ($\rho$)')
+    ax.set_ylabel(r'Mean $\Delta_{CV}$')
+    ax.set_xticks([0.0, 0.6, 0.9])
+    ax.set_ylim(0.0, 0.28)
+    ax.legend(frameon=True, loc='upper left')
+
+    ax = axes[1]
+    drift_plot = drift_summary_df[
+        drift_summary_df['condition'].isin(['leak_free', 'episode_norm'])
+    ].copy()
+    drift_pivot = drift_plot.pivot(
+        index='model_label',
+        columns='condition',
+        values='auc_mean'
+    ).reindex(model_order)
+
+    y_pos = np.arange(len(model_order))
+    for i, model_label in enumerate(model_order):
+        leak_free_auc = drift_pivot.loc[model_label, 'leak_free']
+        episode_norm_auc = drift_pivot.loc[model_label, 'episode_norm']
+        ax.plot(
+            [leak_free_auc, episode_norm_auc],
+            [i, i],
+            color='#7f8c8d',
+            linewidth=2,
+            zorder=1,
+        )
+        ax.scatter(
+            leak_free_auc,
+            i,
+            color='#95a5a6',
+            edgecolor='black',
+            s=45,
+            zorder=2,
+            label='Leak-free' if i == 0 else None,
+        )
+        ax.scatter(
+            episode_norm_auc,
+            i,
+            color='#e67e22',
+            edgecolor='black',
+            s=45,
+            zorder=3,
+            label='Episode norm' if i == 0 else None,
+        )
+
+    ax.set_title('Drift DGP: Preprocessing Effect')
+    ax.set_xlabel('Grouped-CV AUC')
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(model_order)
+    ax.set_xlim(0.42, 0.71)
+    ax.legend(frameon=True, loc='lower right')
+
+    plt.tight_layout()
+
+    if output_path:
+        plt.savefig(output_path, dpi=DPI, bbox_inches='tight')
+        print(f"Saved figure to {output_path}")
+
+    return fig
+
+
 def generate_all_figures(
     results_df: pd.DataFrame,
     output_dir: str = "results/figures"

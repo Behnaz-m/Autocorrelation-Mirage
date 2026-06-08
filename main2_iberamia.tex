@@ -82,18 +82,16 @@ Table~\ref{tab:failure_modes} summarizes the three failure modes emphasized in t
 \begin{table}[t]
 \centering
 \caption{Three distinct sources of evaluation optimism in expanded panel forecasting.}\label{tab:failure_modes}
-\vspace{-2mm}
-\footnotesize
-\begin{tabular}{@{}p{2.15cm}p{4.15cm}p{1.35cm}p{2.15cm}@{}}
+\small
+\begin{tabular}{@{}p{2.35cm}p{3.95cm}p{1.2cm}p{2.25cm}@{}}
 \toprule
 \textbf{Failure mode} & \textbf{Mechanism} & \textbf{Future info?} & \textbf{Primary fix} \\
 \midrule
-Explicit leakage & Feature directly encodes a post-$t$ outcome signal such as $T_e - t$ & Yes & Redesign or remove feature \\
-Normalization leakage & Global or post-$t$ statistics enter transformed inputs & Indirectly & Fit transforms within folds or use trailing statistics \\
-Pseudoreplication & The same episode appears in both train and test folds & No & Group by episode at split time \\
+Explicit leakage & Feature directly reveals a post-$t$ outcome signal such as $T_e - t$ & Yes & Redesign or remove feature \\
+Normalization leakage & Global or post-$t$ summary statistics enter transformed inputs & Indirectly & Fit transforms within folds or use trailing statistics \\
+Pseudoreplication & Rows from the same episode appear in both train and test folds & No & Group by episode at split time \\
 \bottomrule
 \end{tabular}
-\vspace{-3mm}
 \end{table}
 
 Normalization traps are heterogeneous. Simple global standardization $\tilde{X} = (X - \mu)/\sigma$ can be weak when the feature process is approximately stationary, but transforms that use future within-episode values---for example, full-trajectory episode means or episode-wise z-scores---can be much more problematic. Mean imputation uses future observations; episode-mean imputation uses $\bar{X}_e$, which also depends on $T_e$. Centered moving averages use future values by construction. These traps require features with pre-existing trends toward the event. Strictly causal stationary features are often less sensitive, but many real-world variables are not: vital signs may deteriorate before death, equipment diagnostics may worsen before failure, and conflict indicators may escalate before violence.
@@ -118,7 +116,7 @@ We generate $E=30$ episodes with: episode effect $\alpha_e \sim \mathcal{N}(0,0.
 \begin{table}[t]
 \centering
 \caption{Simulation results (30 replicates). Row-wise CV produces the largest optimism in this benchmark.}\label{tab:sim}
-\vspace{-2mm}
+\small
 \begin{tabular}{@{}lccc@{}}
 \toprule
 Condition & AUC & Brier & Inflation \\
@@ -130,15 +128,13 @@ Explicit Leak + Grouped & 0.767 $\pm$ 0.056 & 0.228 $\pm$ 0.046 & +38\% \\
 \bottomrule
 \multicolumn{4}{l}{\footnotesize $^\dagger$See text for interpretation.}
 \end{tabular}
-\vspace{-5mm}
 \end{table}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.78\textwidth]{auc_comparison_bars.png}
+\includegraphics[width=0.72\textwidth]{auc_comparison_bars.png}
 \caption{Main benchmark (30 replicates) under matched five-fold protocols. Row-wise K-Fold inflates AUROC and improves Brier score relative to episode-grouped five-fold validation even though the features are strictly causal.}
 \label{fig:simulation}
-\vspace{-6mm}
 \end{figure}
 
 Table~\ref{tab:sim} and Figure~\ref{fig:simulation} reveal the central finding: row-wise cross-validation alone can create substantial optimism. Random CV yields AUC=0.848 from strictly causal features---a 53\% inflation over grouped CV (AUC=0.554). The $\DeltaCV$ gap is 0.294. In this benchmark, explicit $T_e - t$ leakage inflates by 38\%. Simple global normalization shows +0\% inflation because the base DGP is approximately stationary. That row should therefore be read as a conservative stationary benchmark, not as evidence that preprocessing leakage is unimportant. The same benchmark still averages only about 65 effective observations despite roughly 615 at-risk rows, underscoring that row expansion does not create independent evidence.
@@ -146,7 +142,7 @@ Table~\ref{tab:sim} and Figure~\ref{fig:simulation} reveal the central finding: 
 \begin{table}[t]
 \centering
 \caption{Compact robustness grid: mean $\DeltaCV$ averaged over $E \in \{20,50,100\}$ and $p \in \{5,20,100\}$ (2 replicates per cell).}\label{tab:grid}
-\vspace{-2mm}
+\small
 \begin{tabular}{@{}lccc@{}}
 \toprule
 Model family & $\rho = 0.0$ & $\rho = 0.6$ & $\rho = 0.9$ \\
@@ -156,7 +152,6 @@ Random forest & 0.15 & 0.16 & 0.18 \\
 Boosted trees & 0.20 & 0.24 & 0.24 \\
 \bottomrule
 \end{tabular}
-\vspace{-5mm}
 \end{table}
 
 Table~\ref{tab:grid} tests whether the main result is tied to one model or one dimensionality setting. Across 81 $E \times \rho \times p \times$ model cells, higher-capacity tree ensembles exhibit much larger row-wise optimism than logistic regression. Averaged over $E$ and $p$, mean $\DeltaCV$ rises from 0.15 to 0.18 for random forests and from 0.20 to 0.24 for boosted trees as dependence increases from $\rho=0$ to $\rho=0.9$, whereas logistic regression remains near zero (0.02--0.04). Varying $p$ up to 100 nuisance features does not remove the effect, so the optimism is not confined to low-dimensional settings. The largest individual gaps in the grid are 0.34--0.46 AUC points and occur in the smallest-$E$, highest-dependence, tree-based conditions.
@@ -164,6 +159,15 @@ Table~\ref{tab:grid} tests whether the main result is tied to one model or one d
 The nonzero gap at $\rho=0$ shows that the effect is not driven by autocorrelation alone. Episode-level latent heterogeneity and shared event-time structure can already create row-wise optimism; increasing autocorrelation strengthens the same evaluation-unit mismatch.
 
 Normalization leakage required a second DGP with monotone pre-event drift. In that setting, simple global standardization again had negligible effect, but full-trajectory episode-wise normalization leaked future within-episode values and raised grouped-CV AUC for logistic regression from 0.473 $\pm$ 0.064 to 0.606 $\pm$ 0.004. Tree ensembles were less sensitive in the same experiment. The practical implication is that preprocessing leakage is real but model-dependent: some transforms are benign in a given benchmark, whereas others can materially inflate grouped evaluation.
+
+Figure~\ref{fig:robustness_drift} complements Table~\ref{tab:grid} by making the two supporting patterns visually explicit: the rise in mean $\DeltaCV$ with $\rho$ is concentrated in tree-based learners, and in the drift DGP the largest grouped-CV shift appears for logistic regression under full-trajectory episode normalization.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.94\textwidth]{robustness_drift_companion.png}
+\caption{Companion diagnostics for the strengthening experiments. Left: mean $\DeltaCV$ versus dependence after averaging over $E$ and $p$ for each model family. Right: grouped-CV AUC in the drift DGP under leak-free inputs and full-trajectory episode normalization; global standardization overlaps the leak-free baseline and is omitted for clarity.}
+\label{fig:robustness_drift}
+\end{figure}
 
 \section{The DeltaCV Diagnostic}\label{sec:protocol}
 
