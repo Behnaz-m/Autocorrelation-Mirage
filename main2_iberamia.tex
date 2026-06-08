@@ -6,6 +6,8 @@
 \usepackage{graphicx}
 \usepackage{xcolor}
 \usepackage{enumitem}
+\usepackage{placeins}
+\usepackage{tabularx}
 \setlist{nosep,leftmargin=*}
 \providecommand{\texorpdfstring}[2]{#1}
 
@@ -69,6 +71,30 @@ An observation exhibits \emph{explicit leakage} if a feature is not predictable 
 \begin{definition}[Pseudoreplication]
 \emph{Pseudoreplication} occurs when the evaluation split places observations from the same episode in both training and test folds, violating the independence assumptions underlying row-wise validation even if all features are predictable.
 \end{definition}
+
+The deployment target for unseen episodes is the episode-level risk
+\[
+R_{\mathrm{episode}}(f)
+=
+\E_{e^\star}
+\left[
+\frac{1}{|\mathcal{T}_{e^\star}|}
+\sum_{t\in\mathcal{T}_{e^\star}}
+\ell\{f(X_{e^\star,t}),Y_{e^\star,t}\}
+\right],
+\]
+where $e^\star$ is not represented in the training episodes. Episode-grouped validation estimates this target by holding out complete episodes. Row-wise validation instead estimates a conditional interpolation risk closer to
+\[
+R_{\mathrm{row}}(f)
+=
+\E
+\left[
+\ell\{f(X_{e,t}),Y_{e,t}\}
+\;\middle|\;
+e\in\mathcal{E}_{\mathrm{train}}
+\right],
+\]
+because test rows may share latent episode effects, trajectory structure, and event time with training rows. Thus the issue is not dependence alone; it is a mismatch between the generalization unit implied by deployment and the unit used by validation.
 
 \begin{theorem}[Leakage Guarantees Inflation]\label{thm:leakage}
 If $X_{e,t} = f(T_e - t) + \epsilon_{e,t}$ with $f$ monotone and $\Var(\epsilon) = \sigma^2$, then $\lim_{\sigma^2 \to 0} \text{AUC} = 1$.
@@ -164,6 +190,15 @@ Normalization leakage required a second DGP with monotone pre-event drift. In th
 
 Figure~\ref{fig:robustness_drift} complements Table~\ref{tab:grid} by making the two supporting patterns visually explicit: the rise in mean $\DeltaCV$ with $\rho$ is concentrated in tree-based learners, and in the drift DGP the largest grouped-CV shift appears for logistic regression under full-trajectory episode normalization.
 
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.94\textwidth]{robustness_drift_companion.png}
+\caption{Companion diagnostics for the strengthening experiments. Left: mean $\DeltaCV$ versus dependence after averaging over $E$ and $p$ for each model family. Right: grouped-CV AUC in the drift DGP under leak-free inputs and full-trajectory episode normalization; global standardization overlaps the leak-free baseline and is omitted for clarity.}
+\label{fig:robustness_drift}
+\end{figure}
+
+\FloatBarrier
+
 \section{\texorpdfstring{The $\Delta_{\mathrm{CV}}$ Diagnostic and Dependence-Aware Evaluation Protocol}{The DeltaCV Diagnostic and Dependence-Aware Evaluation Protocol}}
 \label{sec:delta-cv-protocol}
 
@@ -187,13 +222,6 @@ In our main benchmark, $\DeltaCV = 0.294$. In the robustness grid, logistic regr
 
 \textbf{Specificity and failure modes:} a large positive $\DeltaCV$ is a warning flag, not a proof of episode memorization. Distribution shift between grouped folds, severe fold imbalance, episode heterogeneity, or a mismatch between row-wise interpolation and the true deployment target can also enlarge the gap. Near-zero gaps can likewise be false negatives when dependence is weak or model capacity is limited, as illustrated by the logistic-regression cells in Table~\ref{tab:grid}. Practical warning signs are therefore: large positive $\DeltaCV$; substantial disagreement between row-wise and grouped CV; and unusually strong discrimination despite a very small number of episodes.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.94\textwidth]{robustness_drift_companion.png}
-\caption{Companion diagnostics for the strengthening experiments. Left: mean $\DeltaCV$ versus dependence after averaging over $E$ and $p$ for each model family. Right: grouped-CV AUC in the drift DGP under leak-free inputs and full-trajectory episode normalization; global standardization overlaps the leak-free baseline and is omitted for clarity.}
-\label{fig:robustness_drift}
-\end{figure}
-
 \section{Discussion}
 
 The main lesson is not that pseudoreplication is always larger than every other leakage mechanism. Rather, row-wise CV can by itself create severe optimism when expanded rows retain strong episode-specific dependence. This matters because row-wise splitters are convenient defaults in general-purpose ML libraries and can be applied mechanically to expanded panels even when they are inappropriate for the underlying prediction target.
@@ -202,22 +230,24 @@ Row-wise validation is not always invalid. If the deployment target is interpola
 
 \begin{table}[t]
 \centering
-\caption{Audit checklist for panel-expanded event forecasting studies.}\label{tab:audit}
+\caption{Audit checklist for panel-expanded event forecasting studies.}\label{tab:audit-checklist}
 \small
-\begin{tabular}{@{}p{0.30\linewidth}p{0.60\linewidth}@{}}
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{0.98\linewidth}{p{0.42\linewidth}X}
 \toprule
-Question & Why it matters \\
+\textbf{Question} & \textbf{Why it matters} \\
 \midrule
 What is the independent episode unit? & Defines the generalization target and the appropriate grouping variable. \\
 Are rows expanded from episodes? & Determines whether row-wise splitting can create dependence overlap. \\
 Can rows from the same episode appear in both train and test folds? & Directly tests for pseudoreplication. \\
 Are preprocessing parameters fit within each training fold? & Detects normalization, imputation, or filtering leakage. \\
-Are both row-wise and grouped estimates reported? & Makes $\DeltaCV$ observable rather than implicit. \\
+Are both row-wise and grouped estimates reported? & Makes $\Delta_{\mathrm{CV}}$ observable rather than implicit. \\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{table}
 
-Table~\ref{tab:audit} turns the paper's warning into a practical review tool. We do not claim to measure prevalence in the literature here; instead, the checklist highlights the concrete questions that authors, reviewers, and practitioners can apply when auditing panel-expanded forecasting studies.
+Table~\ref{tab:audit-checklist} turns the paper's warning into a practical review tool. We do not claim to measure prevalence in the literature here; instead, the checklist highlights the concrete questions that authors, reviewers, and practitioners can apply when auditing panel-expanded forecasting studies.
 
 Our study has limitations. The evidence remains simulation-based and does not establish how prevalent the problem is in published practice. Although the robustness grid now spans linear, bagged-tree, and boosted-tree models, we do not yet include real-data reanalyses or sequence models. The strongest normalization example used full-trajectory episode-wise normalization on a drift DGP; simple global standardization alone was much weaker in this synthetic setting. Because the label asks whether an event occurs within the next 14 days, the simulated row-level positive prevalence is not ultra-rare even though the underlying daily hazard is low. The paper is therefore best read as a contribution on dependence-aware evaluation for panel-expanded event forecasting rather than as a full study of extreme class imbalance or prevalence in published practice.
 
