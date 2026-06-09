@@ -1,0 +1,3 @@
+Estimate,Delta_CV,95% interval,Notes
+Matched replicate mean,0.283,"[0.246, 0.320]",Paired t interval across replicate-level gaps
+Episode bootstrap,0.283,"[0.141, 0.413]",Mean replicate-wise episode-bootstrap interval; positive lower bound in 30/30 replicates

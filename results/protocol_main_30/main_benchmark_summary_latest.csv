@@ -1,5 +1,7 @@
 condition,auc_mean,auc_std,episode_weighted_auc_mean,episode_mean_brier_mean,brier_mean
 explicit_leak_grouped,0.813,0.042,0.881,0.139,0.198
 leak_free_grouped,0.552,0.101,0.547,0.28,0.33
+leak_free_noskill_grouped,0.43,0.025,0.474,0.254,0.245
 leak_free_random,0.835,0.04,0.823,0.159,0.162
+leak_free_temporal,0.917,0.029,0.952,0.228,0.232
 norm_leak_grouped,0.552,0.101,0.547,0.28,0.33

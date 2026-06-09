@@ -4,9 +4,9 @@ Main simulation experiment for the temporal leakage paper.
 
 This script:
 1. Generates leak-free panel data
-2. Creates 4 experimental conditions
+2. Creates benchmark and diagnostic conditions
 3. Evaluates each condition with grouped and random CV
-4. Produces Table 3 for the paper
+4. Produces manuscript tables
 5. Saves results for figure generation
 
 Run with: python experiments/run_simulation.py [--n_replicates N] [--output_dir DIR]
@@ -21,6 +21,7 @@ from pathlib import Path
 from tqdm import tqdm
 from datetime import datetime
 from scipy import stats
+from sklearn.dummy import DummyClassifier
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -109,6 +110,24 @@ def run_single_replicate(
         'episode_weighted_auc': grouped_metrics['episode_weighted_auc'],
         'episode_mean_brier': grouped_metrics['episode_mean_brier'],
         'method': 'grouped'
+    }
+
+    no_skill_res = evaluate_grouped_cv(
+        X,
+        y,
+        groups,
+        model=DummyClassifier(strategy="prior"),
+        normalize_per_fold=False,
+        n_splits=5,
+        row_ids=row_ids,
+    )
+    no_skill_metrics = _prediction_metrics_from_results(no_skill_res)
+    results["leak_free_noskill_grouped"] = {
+        "auc": no_skill_metrics["auc"],
+        "brier": no_skill_metrics["brier"],
+        "episode_weighted_auc": no_skill_metrics["episode_weighted_auc"],
+        "episode_mean_brier": no_skill_metrics["episode_mean_brier"],
+        "method": "grouped_noskill",
     }
 
     # ====== CONDITION 2: Leak-Free + Random CV (Pseudoreplication) ======
@@ -278,6 +297,7 @@ def run_full_experiment(
     for r in all_results:
         condition_order = [
             'leak_free_grouped',
+            'leak_free_noskill_grouped',
             'leak_free_random',
             'norm_leak_grouped',
             'explicit_leak_grouped',
@@ -384,6 +404,7 @@ def generate_main_table(df_results: pd.DataFrame) -> pd.DataFrame:
     # Rename conditions for paper
     condition_names = {
         'leak_free_grouped': 'Leak-Free + Grouped CV',
+        'leak_free_noskill_grouped': 'No-Skill Prevalence + Grouped CV',
         'leak_free_random': 'Leak-Free + Row-wise KFold',
         'norm_leak_grouped': 'Normalization Leak + Grouped CV',
         'explicit_leak_grouped': 'Explicit Leak + Grouped CV',
@@ -395,11 +416,21 @@ def generate_main_table(df_results: pd.DataFrame) -> pd.DataFrame:
     summary['Brier'] = summary.apply(lambda x: f"{x['brier_mean']:.3f} +/- {x['brier_std']:.3f}", axis=1)
     summary['AUC'] = summary.apply(lambda x: f"{x['auc_mean']:.3f} +/- {x['auc_std']:.3f}", axis=1)
     summary['Delta AUC vs. baseline'] = summary.apply(
-        lambda x: 'baseline' if x['condition'] == 'leak_free_grouped' else f"{x['delta_auc_mean']:+.3f}",
+        lambda x: (
+            'baseline'
+            if x['condition'] == 'leak_free_grouped'
+            else 'target differs'
+            if x['condition'] == 'leak_free_temporal'
+            else f"{x['delta_auc_mean']:+.3f}"
+        ),
         axis=1
     )
     summary['95% paired CI'] = summary.apply(
-        lambda x: '--' if x['condition'] == 'leak_free_grouped' else f"[{x['ci_low']:.3f}, {x['ci_high']:.3f}]",
+        lambda x: (
+            '--'
+            if x['condition'] in {'leak_free_grouped', 'leak_free_temporal'}
+            else f"[{x['ci_low']:.3f}, {x['ci_high']:.3f}]"
+        ),
         axis=1
     )
 
@@ -409,6 +440,7 @@ def generate_main_table(df_results: pd.DataFrame) -> pd.DataFrame:
     # Reorder rows
     order = [
         'Leak-Free + Grouped CV',
+        'No-Skill Prevalence + Grouped CV',
         'Leak-Free + Row-wise KFold',
         'Normalization Leak + Grouped CV',
         'Explicit Leak + Grouped CV',
@@ -416,6 +448,40 @@ def generate_main_table(df_results: pd.DataFrame) -> pd.DataFrame:
     table = table.set_index('Condition').reindex(order).dropna(how='all').reset_index()
 
     return table
+
+
+def generate_delta_uncertainty_table(df_delta: pd.DataFrame) -> pd.DataFrame:
+    """Summarize Delta_CV uncertainty for the manuscript."""
+    if len(df_delta) == 0:
+        return pd.DataFrame(
+            columns=["Estimate", "Delta_CV", "95% interval", "Notes"]
+        )
+
+    paired_low, paired_high = paired_t_interval(df_delta["delta_cv"])
+    share_positive = float((df_delta["ci_lower"] > 0).mean())
+
+    return pd.DataFrame(
+        [
+            {
+                "Estimate": "Matched replicate mean",
+                "Delta_CV": round(df_delta["delta_cv"].mean(), 3),
+                "95% interval": f"[{paired_low:.3f}, {paired_high:.3f}]",
+                "Notes": "Paired t interval across replicate-level gaps",
+            },
+            {
+                "Estimate": "Episode bootstrap",
+                "Delta_CV": round(df_delta["delta_cv"].mean(), 3),
+                "95% interval": (
+                    f"[{df_delta['ci_lower'].mean():.3f}, {df_delta['ci_upper'].mean():.3f}]"
+                ),
+                "Notes": (
+                    "Mean replicate-wise episode-bootstrap interval; "
+                    f"positive lower bound in {int(round(share_positive * len(df_delta)))}"
+                    f"/{len(df_delta)} replicates"
+                ),
+            },
+        ]
+    )
 
 
 def main():
@@ -468,6 +534,9 @@ def main():
     os.makedirs(f"{args.output_dir}/tables", exist_ok=True)
     table3.to_csv(f"{args.output_dir}/tables/table3.csv", index=False)
     print(f"\nTable saved to {args.output_dir}/tables/table3.csv")
+    delta_table = generate_delta_uncertainty_table(df_delta)
+    delta_table.to_csv(f"{args.output_dir}/tables/delta_uncertainty_table.csv", index=False)
+    print(f"Delta uncertainty table saved to {args.output_dir}/tables/delta_uncertainty_table.csv")
     summary = (
         df_results.groupby("condition")
         .agg(
@@ -482,6 +551,10 @@ def main():
     )
     summary.to_csv(f"{args.output_dir}/main_benchmark_summary_latest.csv", index=False)
     print(f"Summary saved to {args.output_dir}/main_benchmark_summary_latest.csv")
+    print("\n" + "=" * 60)
+    print("DELTA_CV UNCERTAINTY")
+    print("=" * 60)
+    print(delta_table.to_string(index=False))
 
     # Print additional statistics
     print("\n" + "=" * 60)
