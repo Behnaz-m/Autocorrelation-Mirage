@@ -85,10 +85,10 @@ def plot_auc_comparison_bars(
     }
 
     colors = {
-        'leak_free_grouped': '#d9d9d9',
-        'leak_free_random': '#525252',
-        'norm_leak_grouped': '#f0f0f0',
-        'explicit_leak_grouped': '#969696'
+        'leak_free_grouped': '#4C78A8',
+        'leak_free_random': '#E45756',
+        'norm_leak_grouped': '#F2CF5B',
+        'explicit_leak_grouped': '#B279A2'
     }
     hatches = {
         'leak_free_grouped': '',
@@ -186,7 +186,7 @@ def plot_four_panel_simulation(
         'explicit_leak_grouped': 'Explicit Leak'
     }
 
-    colors = ['#2ecc71', '#e74c3c', '#e67e22', '#9b59b6']
+    colors = ['#4C78A8', '#E45756', '#F2CF5B', '#B279A2']
     conditions = ['leak_free_grouped', 'leak_free_random', 'norm_leak_grouped', 'explicit_leak_grouped']
 
     # Panel A: AUC boxplot
@@ -472,9 +472,9 @@ def plot_robustness_drift_companion(
 
     model_order = ['Logistic Regression', 'Random Forest', 'Boosted Trees']
     model_styles = {
-        'Logistic Regression': {'color': '#1f1f1f', 'marker': 'o', 'linestyle': '-'},
-        'Random Forest': {'color': '#636363', 'marker': 's', 'linestyle': '--'},
-        'Boosted Trees': {'color': '#969696', 'marker': '^', 'linestyle': '-.'},
+        'Logistic Regression': {'color': '#4C78A8', 'marker': 'o', 'linestyle': '-'},
+        'Random Forest': {'color': '#59A14F', 'marker': 's', 'linestyle': '--'},
+        'Boosted Trees': {'color': '#E15759', 'marker': '^', 'linestyle': '-.'},
     }
 
     ax = axes[0]
@@ -532,7 +532,7 @@ def plot_robustness_drift_companion(
         ax.scatter(
             leak_free_auc,
             i,
-            color='#bdbdbd',
+            color='#7DA0C7',
             edgecolor='black',
             marker='o',
             s=52,
@@ -542,7 +542,7 @@ def plot_robustness_drift_companion(
         ax.scatter(
             episode_norm_auc,
             i,
-            color='#4d4d4d',
+            color='#E4A34A',
             edgecolor='black',
             marker='s',
             s=52,
