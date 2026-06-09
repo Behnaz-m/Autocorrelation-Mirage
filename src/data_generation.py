@@ -1,13 +1,13 @@
 """
-Generate leak-free panel data for rare-event forecasting experiments.
+Generate leak-free panel data for panel-expanded event forecasting experiments.
 
 The data generating process:
 1. Episode effect: α_e ~ N(0, σ_α²)
 2. Latent intensity: Z_{e,t} = φ·Z_{e,t-1} + ε_t, where ε_t ~ N(0, σ_ε²)
 3. Hazard: h_{e,t} = sigmoid(α_e + β·Z_{e,t})
-4. Event time: T_e sampled from discrete hazard
+4. Event time: T_e sampled from discrete hazard when observed before censoring
 5. Features: Transformations of Z_{e,<t} (strictly causal)
-6. Label: Y_{e,t} = 1{t < T_e ≤ t+H}
+6. Labels constructed only where the H-step prediction horizon is observed
 """
 
 import numpy as np
@@ -67,9 +67,12 @@ def generate_single_episode(
         - t: Time index (0, 1, ..., T_max-1 or until event)
         - Z: Latent intensity (for diagnostics, not used in modeling)
         - X_1, X_2, ...: Features (strictly causal transformations of Z)
-        - T_e: Event time for this episode
+        - T_e: Observed event time (NaN if censored)
+        - C_e: Administrative censoring time
+        - event_observed: 1 if the event is observed before or at C_e
         - Y: Label (1 if event within horizon, 0 otherwise)
-        - at_risk: 1 if observation is before event time
+        - at_risk: 1 if row is eligible for supervised evaluation
+        - horizon_observed: 1 if the full H-step horizon is observed
     """
     # Initialize latent process
     Z = np.zeros(T_max)
@@ -86,15 +89,18 @@ def generate_single_episode(
     # Compute hazard at each time point
     hazard = sigmoid(base_hazard + alpha_e + hazard_coef * Z_signal)
 
-    # Sample event time from discrete hazard
-    T_e = T_max + 1  # Default: censored (no event)
+    # Sample event time from discrete hazard, subject to administrative censoring.
+    censor_time = T_max
+    observed_event_time: Optional[int] = None
     for t in range(T_max):
         if rng.random() < hazard[t]:
-            T_e = t + 1  # Event occurs at end of day t (so T_e = t+1)
+            observed_event_time = t + 1  # Event occurs at end of day t.
             break
+    event_observed = observed_event_time is not None
+    T_e = float(observed_event_time) if event_observed else np.nan
 
     # Determine actual episode length
-    episode_length = min(T_e, T_max)
+    episode_length = observed_event_time if event_observed else T_max
 
     # Create features (STRICTLY CAUSAL - only use observed signal at times < t)
     # Feature 1: Lagged latent value
@@ -133,18 +139,23 @@ def generate_single_episode(
     X_3 += rng.normal(0, noise_scale, episode_length)
     X_4 += rng.normal(0, noise_scale, episode_length)
 
-    # Create labels
+    # Create labels and eligibility masks.
     t_values = np.arange(episode_length)
-
-    # Y_{e,t} = 1 if t < T_e <= t + H
-    # This is 1 if the event happens within the next H days
-    if T_e <= T_max:
-        Y = ((t_values < T_e) & (T_e <= t_values + horizon)).astype(int)
+    if event_observed:
+        # For observed-event episodes, every pre-event row is eligible because
+        # the event time is known within the observed trajectory.
+        horizon_observed = np.ones(episode_length, dtype=int)
+        eligible = np.ones(episode_length, dtype=int)
+        Y = (observed_event_time <= t_values + horizon).astype(int)
     else:
-        Y = np.zeros(episode_length, dtype=int)  # Censored: no event
+        # For censored episodes, exclude rows whose full prediction horizon is
+        # not observed by administrative censoring.
+        horizon_observed = (t_values + horizon <= censor_time).astype(int)
+        eligible = horizon_observed.copy()
+        Y = np.zeros(episode_length, dtype=int)
 
-    # At-risk indicator: 1 if we haven't observed the event yet
-    at_risk = (t_values < T_e).astype(int)
+    # Keep the legacy at_risk name as the supervised eligibility indicator.
+    at_risk = eligible
 
     # Create DataFrame
     df = pd.DataFrame({
@@ -157,8 +168,11 @@ def generate_single_episode(
         'X_4': X_4,
         'X_5': X_5,
         'T_e': T_e,
+        'C_e': float(censor_time),
+        'event_observed': int(event_observed),
         'Y': Y,
-        'at_risk': at_risk
+        'at_risk': at_risk,
+        'horizon_observed': horizon_observed
     })
 
     return df
@@ -231,6 +245,7 @@ def generate_panel_data(
 
     # Combine all episodes
     df = pd.concat(episodes, ignore_index=True)
+    df["row_id"] = np.arange(len(df), dtype=int)
 
     return df
 
@@ -284,12 +299,22 @@ def add_noise_features(
     return df
 
 
+def filter_eligible_rows(df: pd.DataFrame) -> pd.DataFrame:
+    """Return rows whose H-step prediction horizon is fully observed."""
+    # Filter to rows whose prediction horizon is fully observed.
+    if 'at_risk' in df.columns:
+        return df[df['at_risk'] == 1].copy()
+    elif 'horizon_observed' in df.columns:
+        return df[df['horizon_observed'] == 1].copy()
+    raise KeyError("Expected 'at_risk' or 'horizon_observed' column in input DataFrame.")
+
+
 def prepare_modeling_data(
     df: pd.DataFrame,
     feature_cols: Optional[list] = None
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    Prepare data for modeling (filter to at-risk observations).
+    Prepare data for modeling (filter to eligible observations).
 
     Returns
     -------
@@ -300,8 +325,7 @@ def prepare_modeling_data(
     groups : np.ndarray
         Episode IDs (for grouped CV)
     """
-    # Filter to at-risk observations only
-    df_atrisk = df[df['at_risk'] == 1].copy()
+    df_atrisk = filter_eligible_rows(df)
 
     if feature_cols is None:
         feature_cols = get_feature_columns(df)

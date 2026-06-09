@@ -35,13 +35,23 @@ import warnings
 try:
     from xgboost import XGBClassifier
     HAS_XGBOOST = True
-except ImportError:
+except Exception:
     XGBClassifier = None
     HAS_XGBOOST = False
 
 
 def get_default_model(seed: int = 42) -> BaseEstimator:
-    """Return the default boosted-tree model for experiments."""
+    """Return the main-benchmark model used in the manuscript."""
+    return HistGradientBoostingClassifier(
+        max_depth=4,
+        learning_rate=0.1,
+        max_iter=100,
+        random_state=seed
+    )
+
+
+def get_xgboost_model(seed: int = 42) -> BaseEstimator:
+    """Return XGBoost when available, else a boosted-tree fallback."""
     if HAS_XGBOOST:
         return XGBClassifier(
             n_estimators=100,
@@ -54,19 +64,12 @@ def get_default_model(seed: int = 42) -> BaseEstimator:
             eval_metric='logloss',
             verbosity=0
         )
-
-    return HistGradientBoostingClassifier(
-        max_depth=4,
-        learning_rate=0.1,
-        max_iter=100,
-        random_state=seed
-    )
+    return get_default_model(seed=seed)
 
 
 def get_logistic_regression_model(seed: int = 42) -> LogisticRegression:
     """Return a regularized logistic-regression baseline."""
     return LogisticRegression(
-        penalty='l2',
         C=1.0,
         solver='lbfgs',
         max_iter=1000,
@@ -88,8 +91,10 @@ def get_random_forest_model(seed: int = 42) -> RandomForestClassifier:
 def create_model(model_name: str, seed: int = 42) -> BaseEstimator:
     """Create a model by name for robustness experiments."""
     model_name = model_name.lower()
-    if model_name == 'xgboost':
+    if model_name == 'boosted_trees':
         return get_default_model(seed=seed)
+    if model_name == 'xgboost':
+        return get_xgboost_model(seed=seed)
     if model_name == 'logistic':
         return get_logistic_regression_model(seed=seed)
     if model_name == 'random_forest':
@@ -100,7 +105,8 @@ def create_model(model_name: str, seed: int = 42) -> BaseEstimator:
 def get_model_display_name(model_name: str) -> str:
     """Return a display label for a model identifier."""
     return {
-        'xgboost': 'XGBoost' if HAS_XGBOOST else 'Boosted Trees',
+        'boosted_trees': 'Boosted Trees',
+        'xgboost': 'Boosted Trees',
         'logistic': 'Logistic Regression',
         'random_forest': 'Random Forest'
     }.get(model_name, model_name)
@@ -140,6 +146,162 @@ def collect_oof_predictions(results: pd.DataFrame) -> Tuple[np.ndarray, np.ndarr
     return y_true, y_prob
 
 
+def collect_oof_prediction_frame(results: pd.DataFrame) -> pd.DataFrame:
+    """
+    Expand per-fold arrays into one aligned prediction frame.
+
+    Expected columns in ``results`` include ``y_true`` and ``y_prob`` plus
+    optional metadata arrays such as ``row_id`` and ``episode_id``.
+    """
+    if len(results) == 0:
+        return pd.DataFrame(columns=["fold", "row_id", "episode_id", "y_true", "y_prob"])
+
+    frames: list[pd.DataFrame] = []
+    for row in results.itertuples(index=False):
+        n_obs = len(row.y_true)
+        frame_dict = {
+            "fold": np.repeat(row.fold, n_obs),
+            "y_true": np.asarray(row.y_true),
+            "y_prob": np.asarray(row.y_prob),
+        }
+        if hasattr(row, "row_id"):
+            frame_dict["row_id"] = np.asarray(row.row_id)
+        if hasattr(row, "episode_id"):
+            frame_dict["episode_id"] = np.asarray(row.episode_id)
+        frames.append(pd.DataFrame(frame_dict))
+
+    pred_df = pd.concat(frames, ignore_index=True)
+    if "row_id" not in pred_df.columns:
+        pred_df["row_id"] = np.arange(len(pred_df), dtype=int)
+    return pred_df
+
+
+def compute_prediction_frame_metrics(pred_df: pd.DataFrame) -> Dict[str, float]:
+    """
+    Compute pooled and episode-weighted metrics from aligned predictions.
+
+    The episode-weighted AUC uses row weights proportional to ``1 / n_e`` so
+    longer episodes do not dominate. The episode-mean Brier score averages the
+    within-episode mean squared error across episodes.
+    """
+    if len(pred_df) == 0:
+        return {
+            "auc": np.nan,
+            "brier": np.nan,
+            "episode_weighted_auc": np.nan,
+            "episode_mean_brier": np.nan,
+            "n_obs": 0,
+        }
+
+    y_true = pred_df["y_true"].to_numpy()
+    y_prob = pred_df["y_prob"].to_numpy()
+    auc = np.nan if len(np.unique(y_true)) < 2 else roc_auc_score(y_true, y_prob)
+    brier = brier_score_loss(y_true, y_prob)
+
+    episode_weighted_auc = np.nan
+    episode_mean_brier = np.nan
+    if "episode_id" in pred_df.columns:
+        episode_counts = pred_df.groupby("episode_id").size()
+        sample_weight = pred_df["episode_id"].map(lambda e: 1.0 / episode_counts.loc[e]).to_numpy()
+        if len(np.unique(y_true)) >= 2:
+            episode_weighted_auc = roc_auc_score(y_true, y_prob, sample_weight=sample_weight)
+        brier_by_episode = (
+            pred_df.assign(brier=(pred_df["y_true"] - pred_df["y_prob"]) ** 2)
+            .groupby("episode_id")["brier"]
+            .mean()
+        )
+        episode_mean_brier = brier_by_episode.mean()
+
+    return {
+        "auc": auc,
+        "brier": brier,
+        "episode_weighted_auc": episode_weighted_auc,
+        "episode_mean_brier": episode_mean_brier,
+        "n_obs": len(pred_df),
+    }
+
+
+def bootstrap_delta_cv(
+    pred_row: pd.DataFrame,
+    pred_group: pd.DataFrame,
+    n_bootstrap: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> Dict[str, float]:
+    """
+    Bootstrap the split-sensitivity gap ``Delta_CV`` by resampling episodes.
+
+    ``pred_row`` and ``pred_group`` must refer to the same eligible rows and be
+    alignable by ``row_id``.
+    """
+    required_cols = {"row_id", "episode_id", "y_true", "y_prob"}
+    if not required_cols.issubset(pred_row.columns) or not required_cols.issubset(pred_group.columns):
+        raise KeyError("bootstrap_delta_cv requires row_id, episode_id, y_true, and y_prob columns.")
+
+    merged = (
+        pred_row[["row_id", "episode_id", "y_true", "y_prob"]]
+        .rename(columns={"y_prob": "y_prob_row"})
+        .merge(
+            pred_group[["row_id", "episode_id", "y_true", "y_prob"]].rename(
+                columns={"y_prob": "y_prob_group", "episode_id": "episode_id_group", "y_true": "y_true_group"}
+            ),
+            on="row_id",
+            how="inner",
+        )
+    )
+
+    if len(merged) == 0:
+        return {
+            "delta_cv": np.nan,
+            "auc_row": np.nan,
+            "auc_group": np.nan,
+            "ci_lower": np.nan,
+            "ci_upper": np.nan,
+            "n_bootstrap_valid": 0,
+        }
+
+    if not (merged["episode_id"] == merged["episode_id_group"]).all():
+        raise ValueError("Row-wise and grouped predictions disagree on episode_id alignment.")
+    if not (merged["y_true"] == merged["y_true_group"]).all():
+        raise ValueError("Row-wise and grouped predictions disagree on y_true alignment.")
+
+    y_true = merged["y_true"].to_numpy()
+    auc_row = np.nan if len(np.unique(y_true)) < 2 else roc_auc_score(y_true, merged["y_prob_row"])
+    auc_group = np.nan if len(np.unique(y_true)) < 2 else roc_auc_score(y_true, merged["y_prob_group"])
+    delta_cv = auc_row - auc_group if np.isfinite(auc_row) and np.isfinite(auc_group) else np.nan
+
+    unique_episodes = merged["episode_id"].drop_duplicates().to_numpy()
+    rng = np.random.default_rng(seed)
+    bootstrap_deltas: list[float] = []
+
+    for _ in range(n_bootstrap):
+        sampled_episodes = rng.choice(unique_episodes, size=len(unique_episodes), replace=True)
+        multiplicities = pd.Series(sampled_episodes).value_counts()
+        weights = merged["episode_id"].map(multiplicities).fillna(0).to_numpy(dtype=float)
+        active = weights > 0
+        if active.sum() == 0 or len(np.unique(y_true[active])) < 2:
+            continue
+        auc_row_boot = roc_auc_score(y_true[active], merged.loc[active, "y_prob_row"], sample_weight=weights[active])
+        auc_group_boot = roc_auc_score(y_true[active], merged.loc[active, "y_prob_group"], sample_weight=weights[active])
+        bootstrap_deltas.append(auc_row_boot - auc_group_boot)
+
+    if len(bootstrap_deltas) == 0:
+        ci_lower = np.nan
+        ci_upper = np.nan
+    else:
+        ci_lower = float(np.percentile(bootstrap_deltas, 100 * alpha / 2))
+        ci_upper = float(np.percentile(bootstrap_deltas, 100 * (1 - alpha / 2)))
+
+    return {
+        "delta_cv": delta_cv,
+        "auc_row": auc_row,
+        "auc_group": auc_group,
+        "ci_lower": ci_lower,
+        "ci_upper": ci_upper,
+        "n_bootstrap_valid": len(bootstrap_deltas),
+    }
+
+
 def compute_pooled_oof_metrics(results: pd.DataFrame) -> Dict[str, float]:
     """
     Compute pooled metrics from out-of-fold predictions.
@@ -163,7 +325,8 @@ def evaluate_grouped_cv(
     groups: np.ndarray,
     model: Optional[BaseEstimator] = None,
     normalize_per_fold: bool = True,
-    n_splits: Optional[int] = None
+    n_splits: Optional[int] = None,
+    row_ids: Optional[np.ndarray] = None,
 ) -> pd.DataFrame:
     """
     Evaluate using leave-one-episode-out cross-validation (CORRECT).
@@ -182,7 +345,7 @@ def evaluate_grouped_cv(
     groups : np.ndarray
         Episode IDs
     model : BaseEstimator, optional
-        Model to use (default: XGBoost)
+        Model to use (default: histogram gradient boosting)
     normalize_per_fold : bool
         Whether to normalize within each fold
     n_splits : int, optional
@@ -197,6 +360,8 @@ def evaluate_grouped_cv(
     """
     if model is None:
         model = get_default_model()
+    if row_ids is None:
+        row_ids = np.arange(len(y), dtype=int)
 
     splitter = LeaveOneGroupOut() if n_splits is None else GroupKFold(
         n_splits=min(n_splits, len(np.unique(groups)))
@@ -228,12 +393,13 @@ def evaluate_grouped_cv(
         test_groups = np.unique(groups[test_idx])
         results.append({
             'fold': fold_idx,
-            'episode_id': test_groups[0] if len(test_groups) == 1 else np.nan,
+            'episode_id': groups[test_idx],
             'auc': auc,
             'brier': brier,
             'n_obs': len(y_test),
             'n_pos': y_test.sum(),
             'n_test_groups': len(test_groups),
+            'row_id': row_ids[test_idx],
             'y_prob': y_prob,
             'y_true': y_test
         })
@@ -247,7 +413,9 @@ def evaluate_random_cv(
     n_splits: int = 5,
     model: Optional[BaseEstimator] = None,
     normalize_before: bool = True,
-    seed: int = 42
+    seed: int = 42,
+    groups: Optional[np.ndarray] = None,
+    row_ids: Optional[np.ndarray] = None,
 ) -> pd.DataFrame:
     """
     Evaluate using random K-fold cross-validation (WRONG for panel data).
@@ -279,6 +447,10 @@ def evaluate_random_cv(
     """
     if model is None:
         model = get_default_model()
+    if row_ids is None:
+        row_ids = np.arange(len(y), dtype=int)
+    if groups is None:
+        groups = np.full(len(y), -1, dtype=int)
 
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
     results = []
@@ -308,12 +480,98 @@ def evaluate_random_cv(
 
         results.append({
             'fold': fold_idx,
+            'episode_id': groups[test_idx],
             'auc': auc,
             'brier': brier,
             'n_obs': len(y_test),
             'n_pos': y_test.sum(),
+            'row_id': row_ids[test_idx],
             'y_prob': y_prob,
             'y_true': y_test
+        })
+
+    return pd.DataFrame(results)
+
+
+def evaluate_temporal_blocked_within_episode_cv(
+    X: np.ndarray,
+    y: np.ndarray,
+    groups: np.ndarray,
+    times: np.ndarray,
+    n_splits: int = 5,
+    model: Optional[BaseEstimator] = None,
+    normalize_per_fold: bool = True,
+    min_train_size: int = 5,
+    row_ids: Optional[np.ndarray] = None,
+) -> pd.DataFrame:
+    """
+    Evaluate a within-episode forecasting target using only past rows for each test block.
+
+    Each fold pools a contiguous future block from every episode and trains only
+    on chronologically earlier rows from those same episodes. This estimates a
+    different target from grouped CV: forecasting later rows of already observed
+    episodes rather than transferring to unseen episodes.
+    """
+    if model is None:
+        model = get_default_model()
+    if row_ids is None:
+        row_ids = np.arange(len(y), dtype=int)
+
+    episode_order = {
+        episode_id: episode_idx[np.argsort(times[episode_idx])]
+        for episode_id in np.unique(groups)
+        for episode_idx in [np.where(groups == episode_id)[0]]
+    }
+    episode_blocks = {
+        episode_id: [block for block in np.array_split(indices, n_splits) if len(block) > 0]
+        for episode_id, indices in episode_order.items()
+    }
+
+    results = []
+    for fold_idx in range(1, n_splits):
+        train_parts: list[np.ndarray] = []
+        test_parts: list[np.ndarray] = []
+
+        for episode_id, blocks in episode_blocks.items():
+            if fold_idx >= len(blocks):
+                continue
+            train_idx = np.concatenate(blocks[:fold_idx]) if fold_idx > 0 else np.array([], dtype=int)
+            test_idx = blocks[fold_idx]
+            if len(train_idx) < min_train_size or len(test_idx) == 0:
+                continue
+            train_parts.append(train_idx)
+            test_parts.append(test_idx)
+
+        if not train_parts or not test_parts:
+            continue
+
+        train_idx = np.concatenate(train_parts)
+        test_idx = np.concatenate(test_parts)
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        if normalize_per_fold:
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            X_test = scaler.transform(X_test)
+
+        if len(np.unique(y_train)) < 2:
+            y_prob = np.full(len(y_test), y_train[0], dtype=float)
+        else:
+            y_prob = _fit_predict_proba(model, X_train, y_train, X_test)
+
+        auc = np.nan if len(np.unique(y_test)) < 2 else roc_auc_score(y_test, y_prob)
+        brier = brier_score_loss(y_test, y_prob)
+        results.append({
+            "fold": fold_idx,
+            "episode_id": groups[test_idx],
+            "auc": auc,
+            "brier": brier,
+            "n_obs": len(y_test),
+            "n_pos": y_test.sum(),
+            "row_id": row_ids[test_idx],
+            "y_prob": y_prob,
+            "y_true": y_test,
         })
 
     return pd.DataFrame(results)

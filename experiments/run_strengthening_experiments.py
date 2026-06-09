@@ -359,13 +359,13 @@ def ensure_dir(path: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--n_replicates", type=int, default=8)
+    parser.add_argument("--n_replicates", type=int, default=2)
     parser.add_argument("--episode_grid", type=str, default="20,50,100")
     parser.add_argument("--ar_grid", type=str, default="0.0,0.6,0.9")
     parser.add_argument("--feature_grid", type=str, default="5,20,100")
-    parser.add_argument("--model_grid", type=str, default="logistic,random_forest,xgboost")
-    parser.add_argument("--grouped_splits", type=int, default=5)
-    parser.add_argument("--random_splits", type=int, default=5)
+    parser.add_argument("--model_grid", type=str, default="logistic,random_forest,boosted_trees")
+    parser.add_argument("--grouped_splits", type=int, default=3)
+    parser.add_argument("--random_splits", type=int, default=3)
     parser.add_argument("--drift_strength", type=float, default=1.0)
     parser.add_argument("--output_dir", type=str, default="results/strengthening")
     args = parser.parse_args()
@@ -407,6 +407,10 @@ def main() -> None:
     drift_df.to_csv(drift_path, index=False)
     drift_summary.to_csv(drift_summary_path, index=False)
 
+    robustness_df.to_csv(f"{args.output_dir}/robustness_grid.csv", index=False)
+    robustness_summary.to_csv(f"{args.output_dir}/robustness_summary.csv", index=False)
+    drift_df.to_csv(f"{args.output_dir}/drift_experiment.csv", index=False)
+    drift_summary.to_csv(f"{args.output_dir}/drift_summary.csv", index=False)
     robustness_df.to_csv(f"{args.output_dir}/robustness_grid_latest.csv", index=False)
     robustness_summary.to_csv(f"{args.output_dir}/robustness_summary_latest.csv", index=False)
     drift_df.to_csv(f"{args.output_dir}/drift_experiment_latest.csv", index=False)

@@ -45,8 +45,10 @@ def add_explicit_leak(
     df = df.copy()
     rng = np.random.default_rng(seed)
 
-    # Compute time-to-event (this uses future information!)
-    time_to_event = df['T_e'] - df['t']
+    # Compute time-to-event for observed events only. Censored rows are assigned
+    # to the low-risk bucket because no event is observed within the panel.
+    observed_mask = df.get('event_observed', df['T_e'].notna()).astype(bool)
+    time_to_event = np.where(observed_mask, df['T_e'] - df['t'], np.inf)
 
     # Create leaked feature
     X_leak = np.where(

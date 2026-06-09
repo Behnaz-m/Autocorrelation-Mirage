@@ -42,4 +42,7 @@ slurm_logs/*.err
 *.blg
 *.log
 *.out
+*.fdb_latexmk
+*.fls
+*.synctex.gz
 missfont.log

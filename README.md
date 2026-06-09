@@ -1,180 +1,152 @@
-# The Autocorrelation Mirage: Pseudoreplication in Panel Forecasting
+# The Autocorrelation Mirage
 
-This repository contains the code and experiments for the paper "The Autocorrelation Mirage: Pseudoreplication Dominates Label Leakage in Panel Forecasting."
+Code and manuscript sources for the paper:
 
-## Key Finding
+`The Autocorrelation Mirage: Dependence-Aware Evaluation for Panel-Expanded Event Forecasting`
 
-**Episode memorization** is a failure mode where models learn to identify which episode an observation belongs to rather than predicting event risk. Standard K-Fold CV—the default in Scikit-Learn—enables this by allowing the same episode to appear in both training and test sets.
+This repository studies three distinct sources of optimistic evaluation in panel-expanded forecasting:
 
-**Result**: AUC inflates from 0.56 to 0.86 (+54%) with *no data leakage whatsoever*. This exceeds even explicit time-to-event leakage (+39%).
+- explicit future-information leakage,
+- preprocessing leakage,
+- pseudoreplication from row-wise cross-validation across dependent episode rows.
 
-## The ΔCV Diagnostic
+The current codebase also handles administrative censoring explicitly: censored no-event episodes contribute only rows whose full forecast horizon is observed.
 
-```
-ΔCV = AUC_random - AUC_grouped
-```
+## Repository Layout
 
-In our simulation, **ΔCV = 0.30**. A gap > 0.05 indicates the model exploits autocorrelation structure rather than learning generalizable signal.
+- `main2_iberamia.tex`: current LNCS/IBERAMIA manuscript source
+- `references.bib`: bibliography
+- `src/data_generation.py`: synthetic panel generator and eligibility filtering
+- `src/evaluation.py`: grouped CV, row-wise CV, temporal-blocked within-episode CV, pooled metrics, episode-weighted metrics, and `Delta_CV` uncertainty helpers
+- `src/leakage_injection.py`: explicit-leak and preprocessing-leak transforms
+- `src/plotting.py`: figure generation
+- `experiments/run_simulation.py`: main benchmark
+- `experiments/run_strengthening_experiments.py`: robustness grid and drift-DGP normalization experiment
+- `scripts/run_benchmark.py`: convenience wrapper for smoke tests and paper-scale reruns
+- `tests/test_censoring_and_grouping.py`: censoring and grouping regression tests
+- `results/`: generated CSVs and figures
 
-## Quick Start
+## Environment
 
-### Setup
+Install dependencies into a virtual environment:
 
 ```bash
-cd /project/shakeri-lab/b/leakage
-bash setup.sh
+python3 -m venv venv
 source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-### Run Quick Test (Local)
+The main benchmark uses `HistGradientBoostingClassifier` consistently across environments. If `xgboost` is unavailable at runtime, robustness-grid requests for the `xgboost` model fall back to the same boosted-tree family.
+
+## Quick Checks
+
+Run the unit tests:
 
 ```bash
-python experiments/run_simulation.py --quick
+venv/bin/python -m unittest discover -s tests -v
 ```
 
-### Run Full Experiment (SLURM)
+Run a lightweight smoke test for the main benchmark:
 
 ```bash
-sbatch slurm/submit_simulation.sh
-squeue -u $USER
-tail -f slurm_logs/simulation_*.out
+MPLCONFIGDIR=/private/tmp/iberamia_mpl_smoke \
+venv/bin/python experiments/run_simulation.py \
+  --n_replicates 2 \
+  --delta_bootstrap_reps 100 \
+  --output_dir results/smoke_main
 ```
 
-## Project Structure
+Run a lightweight smoke test for the strengthening experiments:
 
-```
-leakage/
-├── src/
-│   ├── data_generation.py      # Leak-free synthetic data (AR(1) process)
-│   ├── leakage_injection.py    # Add various types of leakage
-│   ├── evaluation.py           # Grouped CV vs Random CV
-│   ├── diagnostics.py          # Leakage detection tools
-│   └── plotting.py             # Generate figures
-├── experiments/
-│   └── run_simulation.py       # Main simulation (4 conditions × N replicates)
-├── slurm/
-│   ├── submit_simulation.sh    # Full experiment (100 replicates)
-│   └── submit_quick_test.sh    # Quick test (10 replicates)
-├── results/
-│   ├── tables/                 # Generated tables (CSV)
-│   └── figures/                # Generated figures (PNG)
-├── manuscript/
-│   ├── main2.tex               # Paper manuscript
-│   └── figs/                   # Manuscript figures
-├── requirements.txt
-├── setup.sh
-├── README.md                   # This file
-└── CLAUDE.md                   # Development documentation
+```bash
+venv/bin/python experiments/run_strengthening_experiments.py \
+  --n_replicates 1 \
+  --output_dir results/smoke_strengthening
 ```
 
-## Results (100 Replicates)
+Or run both smoke tests through the wrapper:
 
-| Condition | AUC | Brier | Inflation | ΔCV |
-|-----------|-----|-------|-----------|-----|
-| Leak-Free + Grouped CV | 0.56 ± 0.07 | 0.29 ± 0.05 | baseline | — |
-| **Leak-Free + Random CV** | **0.86 ± 0.04** | 0.15 ± 0.02 | **+54%** | **0.30** |
-| Norm. Leak + Grouped | 0.56 ± 0.07 | 0.29 ± 0.05 | +0%* | — |
-| Explicit Leak + Grouped | 0.77 ± 0.04 | 0.16 ± 0.03 | +39% | — |
-
-*Normalization leak shows +0% because synthetic features lack pre-event trends. Real-world features (deteriorating vitals, accumulating errors) would activate this trap.
-
-**Key insight**: Pseudoreplication (+54%) exceeds explicit leakage (+39%). The standard tool (`KFold`) is more dangerous than the worst feature-engineering error.
-
-## Usage Examples
-
-### Generate Leak-Free Data
-
-```python
-from src.data_generation import generate_panel_data, prepare_modeling_data
-
-df = generate_panel_data(n_episodes=30, T_max=60, seed=42)
-X, y, groups = prepare_modeling_data(df)
-print(f"Data shape: {X.shape}, Event rate: {y.mean():.1%}")
-```
-
-### Compute the ΔCV Diagnostic
-
-```python
-from src.evaluation import evaluate_grouped_cv, evaluate_random_cv
-
-results_grouped = evaluate_grouped_cv(X, y, groups)
-results_random = evaluate_random_cv(X, y)
-
-delta_cv = results_random['auc'].mean() - results_grouped['auc'].mean()
-print(f"ΔCV = {delta_cv:.2f}")
-if delta_cv > 0.05:
-    print("WARNING: Model likely exploits episode memorization!")
-```
-
-### Correct Evaluation with Grouped CV
-
-```python
-from src.evaluation import evaluate_grouped_cv
-
-results = evaluate_grouped_cv(X, y, groups)
-print(f"AUC: {results['auc'].mean():.3f}")
+```bash
+venv/bin/python scripts/run_benchmark.py --smoke-test
 ```
 
 ## Reproducing Paper Results
 
-1. **Run Full Simulation**:
-   ```bash
-   sbatch slurm/submit_simulation.sh
-   ```
+Main benchmark used in the paper:
 
-2. **View Results**:
-   ```bash
-   cat results/tables/table3.csv
-   ```
-
-3. **Regenerate Figures**:
-   ```python
-   from src.plotting import generate_all_figures
-   import pandas as pd
-
-   df = pd.read_csv('results/simulation_results_latest.csv')
-   generate_all_figures(df, 'results/figures')
-   ```
-
-## Why This Matters
-
-Pseudoreplication requires only default `KFold`—a single line of code that every practitioner uses. Leakage requires specific conditions (explicit T_e - t features, or trending features with global normalization). This asymmetry makes pseudoreplication the greater threat:
-
-- **Invisible**: The pipeline looks correct
-- **Ubiquitous**: Default in all ML libraries
-- **Activated by default**: No special code needed
-
-The fix is simple: use `GroupKFold` with `groups=episode_id`.
-
-## Dependencies
-
-- Python 3.8+
-- numpy >= 1.21.0
-- pandas >= 1.3.0
-- scikit-learn >= 1.0.0
-- xgboost >= 1.5.0
-- matplotlib >= 3.5.0
-- seaborn >= 0.11.0
-- scipy >= 1.7.0
-- statsmodels >= 0.13.0
-- tqdm >= 4.62.0
-
-## Citation
-
-```bibtex
-@article{autocorrelation_mirage2026,
-  title={The Autocorrelation Mirage: Pseudoreplication Dominates Label Leakage
-         in Panel Forecasting},
-  author={...},
-  journal={...},
-  year={2026}
-}
+```bash
+MPLCONFIGDIR=/private/tmp/iberamia_mpl_main \
+venv/bin/python experiments/run_simulation.py \
+  --n_replicates 30 \
+  --delta_bootstrap_reps 500 \
+  --skip_temporal_baseline \
+  --output_dir results/protocol_main_30
 ```
 
-## License
+Exploratory robustness grid and drift-DGP preprocessing experiment:
 
-MIT License
+```bash
+venv/bin/python experiments/run_strengthening_experiments.py \
+  --n_replicates 2 \
+  --episode_grid 20,50,100 \
+  --ar_grid 0.0,0.6,0.9 \
+  --feature_grid 5,20,100 \
+  --model_grid logistic,random_forest,boosted_trees \
+  --output_dir results/strengthening_pooled
+```
 
-## Contact
+Wrapper for both paper-scale runs:
 
-For questions or issues, please open a GitHub issue or contact the authors.
+```bash
+venv/bin/python scripts/run_benchmark.py --n-reps-main 30 --n-reps-grid 2
+```
+
+The main benchmark writes:
+
+- `results/.../main_benchmark.csv`
+- `results/.../main_benchmark_latest.csv`
+- `results/.../bootstrap_delta_cv.csv`
+- `results/.../main_benchmark_summary_latest.csv`
+- `results/.../bootstrap_delta_cv_latest.csv`
+- `results/.../tables/table3.csv`
+- `results/.../figures/auc_comparison_bars.png`
+
+The strengthening run writes:
+
+- `results/.../robustness_grid.csv`
+- `results/.../robustness_summary.csv`
+- `results/.../drift_experiment.csv`
+- `results/.../drift_summary.csv`
+- `results/.../robustness_grid_latest.csv`
+- `results/.../robustness_summary_latest.csv`
+- `results/.../drift_experiment_latest.csv`
+- `results/.../drift_summary_latest.csv`
+
+## Manuscript Build
+
+Build the current paper with:
+
+```bash
+latexmk -pdf main2_iberamia.tex
+```
+
+If `latexmk` is unavailable, use:
+
+```bash
+pdflatex main2_iberamia.tex
+bibtex main2_iberamia
+pdflatex main2_iberamia.tex
+pdflatex main2_iberamia.tex
+```
+
+## Notes on Metrics
+
+The repository reports both pooled row-level metrics and episode-aware diagnostics:
+
+- pooled AUROC and pooled Brier score,
+- episode-weighted AUROC with row weights proportional to `1 / n_e`,
+- episode-mean Brier score,
+- `Delta_CV = AUC_row - AUC_group`,
+- episode-bootstrap uncertainty for `Delta_CV` based on resampling episode IDs rather than rows.
+
+The temporal-blocked within-episode splitter is included for the different deployment target of forecasting later rows for already observed episodes. The paper tables focus on grouped unseen-episode generalization.

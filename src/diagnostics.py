@@ -12,9 +12,22 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score
-from xgboost import XGBClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 from typing import Dict, List, Tuple, Optional
 import warnings
+
+try:
+    from xgboost import XGBClassifier
+    HAS_XGBOOST = True
+except Exception:
+    XGBClassifier = None
+    HAS_XGBOOST = False
+
+
+def _get_diagnostic_model():
+    if HAS_XGBOOST:
+        return XGBClassifier(n_estimators=100, max_depth=4, verbosity=0)
+    return HistGradientBoostingClassifier(max_depth=4, learning_rate=0.1, max_iter=100)
 
 
 def compute_feature_time_correlation(
@@ -40,8 +53,12 @@ def compute_feature_time_correlation(
         Correlation results for each feature
     """
     df = df[df['at_risk'] == 1].copy()
+    df = df[df.get('event_observed', df['T_e'].notna()).astype(bool)].copy()
 
-    # Compute time-to-event
+    if df.empty:
+        return pd.DataFrame(columns=['feature', 'correlation', 'abs_correlation', 'potential_leak'])
+
+    # Compute time-to-event for observed-event rows only.
     df['time_to_event'] = df['T_e'] - df['t']
 
     results = []
@@ -84,6 +101,9 @@ def analyze_feature_by_horizon(
         Statistics by horizon
     """
     df = df[df['at_risk'] == 1].copy()
+    df = df[df.get('event_observed', df['T_e'].notna()).astype(bool)].copy()
+    if df.empty:
+        return pd.DataFrame(columns=['horizon', 'n_obs', 'mean', 'std', 'median'])
     df['time_to_event'] = df['T_e'] - df['t']
 
     results = []
@@ -140,6 +160,9 @@ def compute_leakage_signature(
         Signature data for each feature
     """
     df = df[df['at_risk'] == 1].copy()
+    df = df[df.get('event_observed', df['T_e'].notna()).astype(bool)].copy()
+    if df.empty:
+        return {}
     df['time_to_event'] = df['T_e'] - df['t']
 
     signatures = {}
@@ -214,7 +237,7 @@ def temporal_cv_diagnostic(
     X_test = scaler.transform(X_test)
 
     # Train model
-    model = XGBClassifier(n_estimators=100, max_depth=4, verbosity=0)
+    model = _get_diagnostic_model()
     model.fit(X_train, y_train)
 
     # Evaluate
@@ -234,7 +257,7 @@ def temporal_cv_diagnostic(
     X_train_r = scaler.fit_transform(X_train_r)
     X_test_r = scaler.transform(X_test_r)
 
-    model = XGBClassifier(n_estimators=100, max_depth=4, verbosity=0)
+    model = _get_diagnostic_model()
     model.fit(X_train_r, y_train_r)
     y_prob_r = model.predict_proba(X_test_r)[:, 1]
     random_auc = roc_auc_score(y_test_r, y_prob_r)
