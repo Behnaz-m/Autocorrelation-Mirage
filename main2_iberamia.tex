@@ -280,9 +280,9 @@ Row-wise validation is not always invalid. If the deployment target is interpola
 \begin{table}[t]
 \centering
 \caption{Audit checklist for panel-expanded event forecasting studies.}\label{tab:audit-checklist}
-\small
-\setlength{\tabcolsep}{5pt}
-\renewcommand{\arraystretch}{1.05}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.0}
 \begin{tabularx}{0.98\linewidth}{p{0.42\linewidth}X}
 \toprule
 \textbf{Question} & \textbf{Why it matters} \\
@@ -296,11 +296,11 @@ Are both row-wise and grouped estimates reported? & Makes $\Delta_{\mathrm{CV}}$
 \end{tabularx}
 \end{table}
 
-Table~\ref{tab:audit-checklist} turns the paper's warning into a practical review tool. We do not claim to measure prevalence in the literature here; instead, the checklist highlights the concrete questions that authors, reviewers, and practitioners can apply when auditing panel-expanded forecasting studies.
+Table~\ref{tab:audit-checklist} turns the paper's warning into a practical audit aid for panel-expanded forecasting studies.
 
-Our study has limitations. The evidence remains simulation-based and does not establish how prevalent the problem is in published practice. Although the robustness grid now spans linear, bagged-tree, and boosted-tree models, we do not yet include real-data reanalyses or sequence models. A compact public reanalysis or semi-synthetic case study would be the next natural extension once page budget permits. The strongest normalization example used full-trajectory episode-wise normalization on a drift DGP; simple global standardization alone was much weaker in this synthetic setting. Because the label asks whether an event occurs within the next 14 days, the simulated row-level positive prevalence is not ultra-rare even though the underlying daily hazard is low. The paper is therefore best read as a contribution on dependence-aware evaluation for panel-expanded event forecasting rather than as a full study of extreme class imbalance or prevalence in published practice.
+Our study has limitations. The evidence remains simulation-based and does not establish how prevalent the problem is in published practice. Although the robustness grid now spans linear, bagged-tree, and boosted-tree models, we do not yet include real-data reanalyses or sequence models. The strongest normalization example used full-trajectory episode-wise normalization on a drift DGP; simple global standardization alone was much weaker in this synthetic setting. Because the label asks whether an event occurs within the next 14 days, the simulated row-level positive prevalence is not ultra-rare despite the low underlying daily hazard.
 
-Even with these limitations, the implication for trustworthy evaluation is straightforward. Panel expansion creates value only if validation respects episode boundaries. In our benchmark, replacing grouped evaluation with row-wise KFold increases AUC by 0.283 despite strictly causal features, and the compact grid shows that the same qualitative problem persists across episode counts, dimensionalities, and model families, especially for tree-based learners. Reporting grouped CV, fold-local preprocessing, $\DeltaCV$, and approximate $n_{\text{eff}}$ would make such optimism easier to detect and easier to discuss transparently in future panel-expanded event forecasting studies.
+Even with these limitations, the implication is straightforward: panel expansion creates value only if validation respects episode boundaries. In our benchmark, row-wise KFold increases AUC by 0.283 despite strictly causal features, and the compact grid shows the same qualitative problem across episode counts, dimensionalities, and model families. Reporting grouped CV, fold-local preprocessing, $\DeltaCV$, and approximate $n_{\text{eff}}$ would make such optimism easier to detect and discuss transparently in future panel-expanded event forecasting studies.
 
 \bibliographystyle{splncs04}
 \bibliography{references}

@@ -5,9 +5,9 @@
 - Upload PDF: `main2_iberamia.pdf`
 - Source file for final edits: `main2_iberamia.tex`
 
-## Required manual edit before submission
+## Required manual confirmation before submission
 
-- Replace `Paper ID XXXX` in `main2_iberamia.tex` with the actual METEOR tracking number assigned by the submission system.
+- Confirm that `Paper ID 73` in `main2_iberamia.tex` matches the actual METEOR tracking number assigned by the submission system.
 
 ## Double-blind checks completed here
 
@@ -31,7 +31,7 @@
 ## Current status
 
 - `main2_iberamia.pdf` compiles successfully in LNCS format.
-- Current length: 7 pages.
+- Current length: 12 pages.
 - The document is under the 12-page IBERAMIA limit.
 
 ## Strengthening priority
