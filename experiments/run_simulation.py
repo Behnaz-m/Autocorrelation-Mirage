@@ -404,7 +404,7 @@ def generate_main_table(df_results: pd.DataFrame) -> pd.DataFrame:
     # Rename conditions for paper
     condition_names = {
         'leak_free_grouped': 'Leak-Free + Grouped CV',
-        'leak_free_noskill_grouped': 'No-Skill Prevalence + Grouped CV',
+        'leak_free_noskill_grouped': 'Training-Fold Prevalence + Grouped CV',
         'leak_free_random': 'Leak-Free + Row-wise KFold',
         'norm_leak_grouped': 'Normalization Leak + Grouped CV',
         'explicit_leak_grouped': 'Explicit Leak + Grouped CV',
@@ -440,7 +440,7 @@ def generate_main_table(df_results: pd.DataFrame) -> pd.DataFrame:
     # Reorder rows
     order = [
         'Leak-Free + Grouped CV',
-        'No-Skill Prevalence + Grouped CV',
+        'Training-Fold Prevalence + Grouped CV',
         'Leak-Free + Row-wise KFold',
         'Normalization Leak + Grouped CV',
         'Explicit Leak + Grouped CV',
@@ -459,6 +459,9 @@ def generate_delta_uncertainty_table(df_delta: pd.DataFrame) -> pd.DataFrame:
 
     paired_low, paired_high = paired_t_interval(df_delta["delta_cv"])
     share_positive = float((df_delta["ci_lower"] > 0).mean())
+    min_lower = float(df_delta["ci_lower"].min())
+    median_lower = float(df_delta["ci_lower"].median())
+    median_upper = float(df_delta["ci_upper"].median())
 
     return pd.DataFrame(
         [
@@ -469,15 +472,16 @@ def generate_delta_uncertainty_table(df_delta: pd.DataFrame) -> pd.DataFrame:
                 "Notes": "Paired t interval across replicate-level gaps",
             },
             {
-                "Estimate": "Episode bootstrap",
+                "Estimate": "Mean within-replicate bootstrap",
                 "Delta_CV": round(df_delta["delta_cv"].mean(), 3),
                 "95% interval": (
                     f"[{df_delta['ci_lower'].mean():.3f}, {df_delta['ci_upper'].mean():.3f}]"
                 ),
                 "Notes": (
-                    "Mean replicate-wise episode-bootstrap interval; "
-                    f"positive lower bound in {int(round(share_positive * len(df_delta)))}"
-                    f"/{len(df_delta)} replicates"
+                    "Median interval "
+                    f"[{median_lower:.3f}, {median_upper:.3f}]; "
+                    f"minimum lower endpoint {min_lower:.3f}; positive lower bound in "
+                    f"{int(round(share_positive * len(df_delta)))}/{len(df_delta)} replicates"
                 ),
             },
         ]

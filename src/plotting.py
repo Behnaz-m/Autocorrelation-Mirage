@@ -25,7 +25,7 @@ FIGSIZE_SINGLE = (5, 4)
 FIGSIZE_DOUBLE = (10, 4)
 FIGSIZE_QUAD = (10, 8)
 DPI = 300
-FONTSIZE = 10
+FONTSIZE = 11
 
 
 def setup_figure_style():
@@ -85,10 +85,16 @@ def plot_auc_comparison_bars(
     }
 
     colors = {
-        'leak_free_grouped': '#2ecc71',  # Green (correct)
-        'leak_free_random': '#e74c3c',   # Red (wrong)
-        'norm_leak_grouped': '#e67e22',  # Orange (implicit leak)
-        'explicit_leak_grouped': '#9b59b6'  # Purple (explicit leak)
+        'leak_free_grouped': '#d9d9d9',
+        'leak_free_random': '#525252',
+        'norm_leak_grouped': '#f0f0f0',
+        'explicit_leak_grouped': '#969696'
+    }
+    hatches = {
+        'leak_free_grouped': '',
+        'leak_free_random': '//',
+        'norm_leak_grouped': '..',
+        'explicit_leak_grouped': 'xx'
     }
 
     fig, ax = plt.subplots(figsize=figsize)
@@ -104,13 +110,27 @@ def plot_auc_comparison_bars(
         if len(row) > 0:
             mean_val = row['mean'].values[0]
             std_val = row['std'].values[0]
-            bar = ax.bar(i, mean_val, yerr=std_val, capsize=5,
-                        color=colors[cond], edgecolor='black', linewidth=1)
+            bar = ax.bar(
+                i,
+                mean_val,
+                yerr=std_val,
+                capsize=5,
+                color=colors[cond],
+                edgecolor='black',
+                linewidth=1.2,
+                hatch=hatches[cond],
+            )
             bars.append(bar)
 
             # Add value label on bar
-            ax.text(i, mean_val + std_val + 0.02, f'{mean_val:.3f}',
-                   ha='center', va='bottom', fontsize=FONTSIZE-1)
+            ax.text(
+                i,
+                mean_val + std_val + 0.02,
+                f'{mean_val:.3f}',
+                ha='center',
+                va='bottom',
+                fontsize=FONTSIZE - 1,
+            )
 
     ax.set_xticks(x_pos)
     ax.set_xticklabels([condition_labels[c] for c in condition_order])
@@ -451,10 +471,10 @@ def plot_robustness_drift_companion(
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     model_order = ['Logistic Regression', 'Random Forest', 'Boosted Trees']
-    model_colors = {
-        'Logistic Regression': '#1f77b4',
-        'Random Forest': '#2ca02c',
-        'Boosted Trees': '#d62728',
+    model_styles = {
+        'Logistic Regression': {'color': '#1f1f1f', 'marker': 'o', 'linestyle': '-'},
+        'Random Forest': {'color': '#636363', 'marker': 's', 'linestyle': '--'},
+        'Boosted Trees': {'color': '#969696', 'marker': '^', 'linestyle': '-.'},
     }
 
     ax = axes[0]
@@ -469,13 +489,15 @@ def plot_robustness_drift_companion(
         subset = robustness_plot[robustness_plot['model_label'] == model_label]
         if subset.empty:
             continue
+        style = model_styles[model_label]
         ax.plot(
             subset['ar_coef'],
             subset['delta_cv_mean'],
-            marker='o',
+            marker=style['marker'],
             linewidth=2,
-            markersize=5,
-            color=model_colors[model_label],
+            markersize=6,
+            linestyle=style['linestyle'],
+            color=style['color'],
             label=model_label,
         )
 
@@ -510,18 +532,20 @@ def plot_robustness_drift_companion(
         ax.scatter(
             leak_free_auc,
             i,
-            color='#95a5a6',
+            color='#bdbdbd',
             edgecolor='black',
-            s=45,
+            marker='o',
+            s=52,
             zorder=2,
             label='Leak-free' if i == 0 else None,
         )
         ax.scatter(
             episode_norm_auc,
             i,
-            color='#e67e22',
+            color='#4d4d4d',
             edgecolor='black',
-            s=45,
+            marker='s',
+            s=52,
             zorder=3,
             label='Episode norm' if i == 0 else None,
         )

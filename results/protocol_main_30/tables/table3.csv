@@ -1,6 +1,6 @@
 Condition,AUC,Brier,Delta AUC vs. baseline,95% paired CI
 Leak-Free + Grouped CV,0.552 +/- 0.101,0.330 +/- 0.048,baseline,--
-No-Skill Prevalence + Grouped CV,0.430 +/- 0.025,0.245 +/- 0.009,-0.122,"[-0.159, -0.086]"
+Training-Fold Prevalence + Grouped CV,0.430 +/- 0.025,0.245 +/- 0.009,-0.122,"[-0.159, -0.086]"
 Leak-Free + Row-wise KFold,0.835 +/- 0.040,0.162 +/- 0.023,+0.283,"[0.246, 0.320]"
 Normalization Leak + Grouped CV,0.552 +/- 0.101,0.330 +/- 0.048,+0.000,"[0.000, 0.000]"
 Explicit Leak + Grouped CV,0.813 +/- 0.042,0.198 +/- 0.041,+0.261,"[0.236, 0.286]"
