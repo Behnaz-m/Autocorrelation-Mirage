@@ -5,7 +5,9 @@
 - `latexmk -pdf -halt-on-error -interaction=nonstopmode main2_iberamia.tex` succeeds at 12 pages with resolved citations and references.
 - The clean source ZIP was extracted to `/private/tmp/paper76-build` and compiled successfully at 12 pages.
 - Figure 2 was inspected at 300 dpi in `camera_ready/figure2_print_check.png`; labels, markers, and non-colour line/marker distinctions are legible at embedded width.
-- Final PDF SHA-256: `2ecc1366d4513e520cec46cf26d385f018b83918eb4c3604c3f9e208160fde59`.
-- Final ZIP SHA-256: `4951ccd73562bf489f4289227cabd85b7fea27cb6fd3bde0f06c89b239a4f1ce`.
+- Corrected mechanism isolation: fingerprint off/event time off -0.001 [-0.008, 0.006]; fingerprint off/event time on 0.038 [0.028, 0.048]; fingerprint on/event time off 0.006 [-0.001, 0.014]; both on 0.283 [0.246, 0.320].
+- Figure 2 is `robustness_drift_companion.pdf` (vector PDF; TrueType embedding configured) and was re-rendered at 300 dpi.
+- Final PDF SHA-256: `b8d475367cea699f59cb307cdfef25835022a0d2be3d405851e535f6bc5e5389`.
+- Final ZIP SHA-256: `77e3a6dce00b8e9089566abf0ebedfff4ed88b77e0b49a8ee482691165a315e9`.
 
 `pdfinfo` and `pdffonts` are unavailable in this environment, so those two optional PDF checks were not run. The source uses the existing raster Figure 2; its page-level print inspection passed.

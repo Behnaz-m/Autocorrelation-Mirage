@@ -214,18 +214,18 @@ Figure~\ref{fig:robustness_drift} shows larger $\DeltaCV$ values for tree-based 
 
 \begin{figure}[!htbp]
 \centering
-\includegraphics[width=0.94\textwidth]{robustness_drift_companion.png}
+\includegraphics[width=0.94\textwidth]{robustness_drift_companion.pdf}
 \caption{Companion diagnostics for the strengthening experiments. Left: mean $\DeltaCV$ versus dependence after averaging over $E$ and $p$ for each model family. Right: grouped-CV AUC in the drift DGP under leak-free inputs and full-trajectory episode normalization; global standardization overlaps the leak-free baseline and is omitted for clarity.}
 \label{fig:robustness_drift}
 \end{figure}
 
-\paragraph{Mechanism ablation.} We independently set the episode-effect variance ($\sigma_\alpha=0$ versus 0.5) and the AR(1)-to-hazard pathway ($\phi=\beta=0$ versus 0.7 and 0.15). Table~\ref{tab:ablation} reports 30 paired replicates per cell. The gap remains positive even with both switches off, so the factorial design does not support attributing all optimism to either switch alone: shared episode event times and truncation still permit row-wise interpolation. Activating the temporal pathway gives the largest gap (0.285 without, 0.283 with heterogeneity), while heterogeneity alone produces 0.250.
+\paragraph{Mechanism isolation.} Table~\ref{tab:ablation} uses a matched-prevalence negative control. The fingerprint-off condition removes $X_5$ and all episode-constant random features. The shared-event-time-off condition uses fixed-length episodes and independent row outcomes, so it is not an event-forecasting model. With both factors off, the gap is -0.001 [--0.008, 0.006]. Shared event-time labeling alone produces 0.038 [0.028, 0.048], and the fingerprint alone produces 0.006 [--0.001, 0.014]. Both together recover 0.283 [0.246, 0.320]. Thus, neither isolated factor reproduces the headline effect; their combination does in this DGP.
 
 \begin{table}[t]
 \centering
-\caption{Mechanism ablation (30 paired replicates/cell). Temporal state switches the AR(1)-to-hazard pathway; prevalence is reported to show comparable marginals.}\label{tab:ablation}
+\caption{Mechanism isolation (30 paired replicates/cell). The event-time-off cells are fixed-length, independent-row negative controls.}\label{tab:ablation}
 \scriptsize
-\input{generated/mechanism_ablation_table.tex}
+\input{generated/mechanism_isolation_v2_table.tex}
 \end{table}
 
 \FloatBarrier

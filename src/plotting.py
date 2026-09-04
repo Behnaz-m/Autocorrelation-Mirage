@@ -43,6 +43,8 @@ def setup_figure_style():
         'savefig.bbox': 'tight',
         'savefig.pad_inches': 0.1
     })
+    plt.rcParams['pdf.fonttype'] = 42
+    plt.rcParams['ps.fonttype'] = 42
 
 
 def plot_auc_comparison_bars(
