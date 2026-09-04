@@ -5,21 +5,20 @@
 - Upload PDF: `main2_iberamia.pdf`
 - Source file for final edits: `main2_iberamia.tex`
 
-## Required manual confirmation before submission
+## Required camera-ready metadata before submission
 
-- Confirm that `Paper ID 73` in `main2_iberamia.tex` matches the actual METEOR tracking number assigned by the submission system.
+- Paper ID is **76**. Do not display it in the manuscript unless Springer explicitly requires it.
+- Replace the intentionally blank author block in `main2_iberamia.tex` with the authors' final, authoritative names, order, affiliations, countries, email addresses, and corresponding-author designation. This repository does not contain that authoritative metadata.
 
-## Double-blind checks completed here
+## Superseded double-blind checks
 
-- Author names and affiliations were removed from the LNCS submission file.
+- The old anonymous submission removed author names and affiliations. That is not suitable for camera-ready upload.
 - The conference version does not mention GitHub, Overleaf, or a public repository.
 - A raw string scan of `main2_iberamia.pdf` did not reveal obvious author or institution names.
 
 ## Remaining manual double-blind checks
 
-- If there is a public preprint, public repo, or project page with the same distinctive title, decide whether that is acceptable under the conference's double-blind policy.
-- If the submission site asks for supplementary material, avoid uploading files whose names or metadata identify the authors.
-- If you regenerate the PDF elsewhere, recheck that the author field in the exported PDF metadata does not contain author names.
+- Confirm the final Springer/IBERAMIA author and PDF-metadata requirements with the production instructions.
 
 ## Upload hygiene
 
@@ -30,9 +29,10 @@
 
 ## Current status
 
+- Paper was accepted with minor revisions (2026-08). Reviewer 1 asked for a related-work section, a separate conclusions section, tighter intro motivation, and a shorter abstract; Reviewer 2 asked for a higher-signal robustness condition, a 10-replicate robustness grid, fully specified second DGP, and several framing fixes. All were implemented; see git log for the revision commit.
 - `main2_iberamia.pdf` compiles successfully in LNCS format.
-- Current length: 12 pages.
-- The document is under the 12-page IBERAMIA limit.
+- Current length: 16 pages. This exceeds the stated 12-page IBERAMIA limit and must be substantively shortened or explicitly approved by the organizers before upload.
+- The drift-DGP normalization experiment (Section 6) was re-run at 10 replicates, then at 30 (matching the main benchmark) once the 10-replicate run showed the estimate was still unstable for two of three model families. Final numbers: +0.045 logistic (95% CI [-0.010, 0.100]), +0.063 random forest (95% CI [0.029, 0.096], clearly significant), +0.034 boosted trees (95% CI [-0.010, 0.077]) — small, consistent, mostly borderline. This does not match the original 2-replicate estimate reported in the accepted version (logistic regression: was 0.445→0.641), which the properly replicated run shows was driven by sampling noise. The manuscript reports the corrected, 30-replicate numbers and says so explicitly. Worth a final sanity check before submission.
 
 ## Strengthening priority
 

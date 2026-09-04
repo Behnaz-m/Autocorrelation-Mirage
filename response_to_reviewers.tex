@@ -1,0 +1,151 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+
+\newcommand{\DeltaCV}{\Delta_{\text{CV}}}
+\newcommand{\rc}[1]{\textit{``#1''}}
+\newenvironment{response}{\begin{quote}\color{black}}{\end{quote}}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{}{0pt}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{}{0pt}{}
+
+\title{Response to Reviewers\\
+\large The Autocorrelation Mirage: Dependence-Aware Evaluation for Panel-Expanded Event Forecasting\\
+\normalsize IBERAMIA 2026, Paper ID 76}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+We thank both reviewers for a careful and constructive reading of the paper. Both the restructuring requested by Reviewer 1 and the additional experiments requested by Reviewer 2 have been carried out in full. This letter responds to each point in turn and gives the corresponding location in the revised manuscript. Reviewer comments are quoted in italics; our responses follow in plain text.
+
+One point up front, since it is the most consequential change in this revision: acting on Reviewer 2's request to raise the robustness-grid and drift-DGP replicate counts, we re-ran the normalization-leakage (drift) experiment first at 10 replicates and then, once that run showed the estimate was still unstable for two of three model families, at 30 replicates -- matching the replicate count used for the main benchmark. The properly replicated, paired estimates are $+0.045$ for logistic regression (95\% CI $[-0.010, 0.100]$), $+0.063$ for random forests (95\% CI $[0.029, 0.096]$), and $+0.034$ for boosted trees (95\% CI $[-0.010, 0.077]$): a small, consistent, positive effect across all three model families, clearly significant only for random forests, with the other two borderline. This does not reproduce the original 2-replicate point estimate for logistic regression (previously reported as an increase from AUC 0.445 to 0.641), which the 30-replicate run shows to have been driven by sampling variability rather than a large true effect. We report the corrected numbers directly in the revised paper (Section 6, paragraph on normalization leakage) and say explicitly that the earlier estimate was not reliable at that replicate count. We flag it here as well so it is not mistaken for an inconsistency between this letter and the paper.
+
+\section*{Review 1 (Revision)}
+
+\begin{response}
+\rc{The introduction is very formal, quite abstract, lacking a concrete contextualization with reference to concrete applications, revealing its limitations in order to define the motivation of the work carried out, which is not well accomplished.}
+\end{response}
+
+The introduction now opens with a concrete motivating scenario (a hospital forecasting patient deterioration from a small number of clinical trajectories) before any formalism, and explicitly connects that scenario to the paper's other target domains (predictive maintenance, conflict early-warning forecasting) to motivate why panel expansion under a small number of independent units is a real, recurring problem rather than an abstract one. See Section 1, first two paragraphs.
+
+\begin{response}
+\rc{Also, the structure of the article doesn't follow na usual paper pattern. It would be good, in the first section, to characterize the various sections, revealing what each of them addresses.}
+\end{response}
+
+We added a roadmap paragraph at the end of the introduction that previews every section and what it covers (Section 1, final paragraph). We also renamed and reorganized sections to follow a more conventional structure: Related Work now immediately follows the Introduction, and a standalone Conclusions section now closes the paper (see below).
+
+\begin{response}
+\rc{It lacks a related work section. It would enrich the article and create a good basis for comparison for the various strategies developed and presented.}
+\end{response}
+
+We added a new Section 2, ``Related Work,'' organized into four themes: leakage taxonomies, blocked/grouped/subject-wise cross-validation, pseudoreplication (including two additional citations on record-wise vs.\ subject-wise validation in clinical and wearable-sensor ML: Saeb et al., 2017; Vabalas et al., 2019), and panel-expanded conflict forecasting. It closes with an explicit statement of this paper's contribution relative to each strand.
+
+\begin{response}
+\rc{The remaining sections are ok. However, the work reveals some weakness in sustaining formalization, since it does not make a concrete connection to an application of the techniques discussed.}
+\end{response}
+
+Beyond the new introductory vignette, the discussion of implicit normalization traps (Section 4) already grounded the formal definitions in concrete examples (vital signs deteriorating before death, equipment diagnostics worsening before failure, conflict indicators escalating before violence); we have kept and reinforced these connections throughout the empirical and discussion sections so the formal apparatus is repeatedly tied back to what an analyst would actually observe in one of the three motivating domains.
+
+\begin{response}
+\rc{Although the article presents a discussion section, with interest and pertinence, it lacks a conclusions section, with a more detailed analysis and a concrete comparison with other works and reference to the added value of the article.}
+\end{response}
+
+We split the material into a Discussion section (Section 8: scope, when row-wise or temporal validation is and is not appropriate, limitations, audit checklist) and a new, separate Conclusions section (Section 9), which restates the three main empirical findings, explicitly compares the paper's contribution against the related work discussed in Section 2, and states the added value (a controlled data-generating process that isolates pseudoreplication's effect size from explicit and preprocessing leakage under one shared, stress-tested protocol, plus a no-cost diagnostic).
+
+\begin{response}
+\rc{One last observation: the abstract is too long.}
+\end{response}
+
+The abstract has been rewritten to approximately 165 words while preserving the central results and limitations. It opens with the clarification that autocorrelation is a simplification of the true mechanism, addressing Reviewer 2's related framing comment.
+
+\section*{Review 2 (Acceptance, minor revisions)}
+
+\subsection*{Weaknesses and Improvement 1: near-chance grouped baseline}
+
+\begin{response}
+\rc{The main limitation is that the grouped baseline performs close to chance, suggesting that the reported performance gap represents a worst-case scenario rather than a typical effect. \dots{} add a condition in which the coefficient on the latent process is raised so that grouped CV attains a genuinely non-trivial AUROC, and report the gap in that regime alongside the current one.}
+\end{response}
+
+We added exactly this check (new Section 6.1, ``Does the Gap Survive a Genuinely Non-Trivial Grouped Baseline?,'' and Table 5). We first tried raising the coefficient linking the AR(1) latent process to the hazard, as the review suggests -- this is the more obvious lever -- but it left grouped-CV AUC near chance (0.537--0.580) across an almost ninefold range of the coefficient, because that latent process is episode-specific and does not transfer across episodes. We report this negative result because it explains \emph{why} the original grouped baseline is weak. Raising the standard deviation of the episode random effect instead (the source of genuinely transferable, between-episode signal) succeeds: grouped-CV AUC reaches a genuinely non-trivial 0.723, and the row-wise gap remains large and clearly significant ($\DeltaCV = 0.199$, 95\% CI [0.170, 0.229]). This is now the strongest single piece of evidence in the paper that the effect is not an artifact of a deliberately weak-signal benchmark.
+
+\subsection*{Title and framing}
+
+\begin{response}
+\rc{The title also overemphasizes autocorrelation, whereas the results indicate that latent episode heterogeneity is the primary driver.}
+\end{response}
+
+Per your suggested alternative, we kept the title (it is the established identifier for this work) and moved the clarification to the very front: the abstract's first sentence now states that the title's emphasis on autocorrelation is a simplification and that latent episode heterogeneity and shared event-time structure drive the effect at least as much as serial correlation. The same point opens the empirical discussion of the zero-autocorrelation robustness-grid cells (Section 6, ``The nonzero gap at $\rho=0$\dots'').
+
+\subsection*{Improvement 3: robustness-grid replicate count and episode-count breakdown}
+
+\begin{response}
+\rc{Raise the robustness grid to at least ten replicates per cell and report the gap as a function of episode count for each model family, either as a supplementary table or an additional panel in Figure 2.}
+\end{response}
+
+The robustness grid was re-run at 10 replicates per cell (was 2); Table 4 and the surrounding text (Section 6) are updated accordingly. The qualitative pattern is unchanged (logistic regression near zero, random forests and boosted trees substantially larger, growing with dependence) but the per-cell ranges are markedly tighter than the exploratory 2-replicate version. We added a new Table 5, breaking the same $\DeltaCV$ gap out by episode count instead of dependence, showing that the gap shrinks somewhat as the number of episodes grows from 20 to 100 but remains large for tree ensembles even at $E=100$.
+
+\subsection*{Improvement 4: Theorem 1}
+
+\begin{response}
+\rc{Theorem 1 is largely self-evident and provides limited practical insight, while Proposition 1 is more useful. \dots{} demote Theorem 1 to a remark and use the reclaimed space for the signal-strength condition.}
+\end{response}
+
+Theorem 1 is now Remark 1, reframed explicitly as a sanity check rather than a substantive result, and the formal proof block was removed in favor of a shorter explanatory argument folded into the remark itself. Proposition 1 (sibling overlap under shuffled row-wise K-fold) is unchanged. We did not add a new formal non-asymptotic bound, since the review marked that as optional (\rc{if the authors wish to retain a formal result}); the reclaimed space, and more, went to the mandatory higher-signal experiment in Section 6.1 instead, which we judged to be of more practical value than a new formal bound.
+
+\subsection*{Improvement 5: second DGP precision, replicate count, tree-ensemble numbers}
+
+\begin{response}
+\rc{Specify the second data-generating process with the same precision as the first, report its replicate count, and give the tree-ensemble numbers explicitly. \dots{} deserves more than its current single sentence.}
+\end{response}
+
+The drift-DGP paragraph (Section 6) now states the exact functional form of the drift term, the drift strength used, and confirms all other parameters match the main benchmark. It reports 30 replicates per model family (up from 2) and gives paired point estimates and 95\% confidence intervals for all three model families explicitly (logistic regression, random forest, boosted trees), rather than a single number for logistic regression alone. As noted above, this more careful run changed the finding materially, and we say so in the text.
+
+\subsection*{Improvement 6: real-data illustration / simulation-only limitation}
+
+\begin{response}
+\rc{Add a single real-data illustration if any suitable dataset is accessible, and in any case state the simulation-only limitation in the abstract.}
+\end{response}
+
+No suitable public dataset with the necessary panel-expanded, small-episode-count, event-time structure and ground truth was accessible within the revision window, so we adopted the stated minimum: the abstract's final sentence now states plainly that all evidence is simulation-based, and the limitations paragraph (Section 8) repeats this as the first limitation listed.
+
+\subsection*{Minor points}
+
+\begin{response}
+\rc{The temporal-blocked baseline at 0.917 deserves more prominence, since many practitioners believe a temporal split is sufficient protection.}
+\end{response}
+
+Added a dedicated paragraph in the Discussion (Section 8) contrasting the temporal-blocked AUC (0.917) with the row-wise (0.835) and grouped (0.552) figures, explaining why a chronological split within an episode does not certify unseen-episode generalization, and stating explicitly that ``we used a time-based split'' is not by itself sufficient evidence against pseudoreplication.
+
+\begin{response}
+\rc{The audit checklist should include a question about the intended deployment target.}
+\end{response}
+
+Added as the second row of Table 8 (audit checklist): \emph{``What is the deployment target: new-episode generalization or forecasting later rows of known episodes?''}
+
+\begin{response}
+\rc{The clustered-data and subject-wise cross-validation literatures should be cited.}
+\end{response}
+
+Added to the new Related Work section: Saeb et al. (2017) and Vabalas et al. (2019), both on record-wise vs.\ subject-wise cross-validation in clustered clinical/wearable-sensor samples.
+
+\begin{response}
+\rc{The abstract and body report the headline figures at inconsistent precision.}
+\end{response}
+
+The abstract now reports all headline AUC and $\DeltaCV$ figures at three decimal places, matching the body and tables throughout.
+
+\begin{response}
+\rc{The right panel of Figure 2 is difficult to read at printed size.}
+\end{response}
+
+Figure 2 was regenerated: the overall figure is larger, marker sizes and axis limits were increased, and each point in the right panel is now directly annotated with its AUC value rather than relying on the reader to read values off the axis.
+
+\end{document}

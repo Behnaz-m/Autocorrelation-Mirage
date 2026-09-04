@@ -360,6 +360,12 @@ def ensure_dir(path: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--n_replicates", type=int, default=2)
+    parser.add_argument(
+        "--drift_replicates",
+        type=int,
+        default=None,
+        help="Replicates for the drift-DGP experiment; defaults to --n_replicates if unset.",
+    )
     parser.add_argument("--episode_grid", type=str, default="20,50,100")
     parser.add_argument("--ar_grid", type=str, default="0.0,0.6,0.9")
     parser.add_argument("--feature_grid", type=str, default="5,20,100")
@@ -390,7 +396,7 @@ def main() -> None:
     robustness_summary = summarize_robustness(robustness_df)
 
     drift_df = run_drift_normalization_experiment(
-        n_replicates=args.n_replicates,
+        n_replicates=args.drift_replicates if args.drift_replicates is not None else args.n_replicates,
         model_grid=model_grid,
         grouped_splits=args.grouped_splits,
         drift_strength=args.drift_strength,

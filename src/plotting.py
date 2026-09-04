@@ -453,7 +453,7 @@ def plot_robustness_drift_companion(
     robustness_summary_df: pd.DataFrame,
     drift_summary_df: pd.DataFrame,
     output_path: Optional[str] = None,
-    figsize: Tuple[float, float] = (9, 3.8)
+    figsize: Tuple[float, float] = (11, 4.6)
 ) -> plt.Figure:
     """
     Create a compact two-panel figure for the LNCS submission.
@@ -535,7 +535,7 @@ def plot_robustness_drift_companion(
             color='#7DA0C7',
             edgecolor='black',
             marker='o',
-            s=52,
+            s=90,
             zorder=2,
             label='Leak-free' if i == 0 else None,
         )
@@ -545,17 +545,38 @@ def plot_robustness_drift_companion(
             color='#E4A34A',
             edgecolor='black',
             marker='s',
-            s=52,
+            s=90,
             zorder=3,
             label='Episode norm' if i == 0 else None,
+        )
+        ax.annotate(
+            f'{leak_free_auc:.3f}',
+            (leak_free_auc, i),
+            textcoords='offset points',
+            xytext=(0, 11),
+            ha='center',
+            fontsize=FONTSIZE - 2,
+            color='#3d5a75',
+        )
+        ax.annotate(
+            f'{episode_norm_auc:.3f}',
+            (episode_norm_auc, i),
+            textcoords='offset points',
+            xytext=(0, 11),
+            ha='center',
+            fontsize=FONTSIZE - 2,
+            color='#8a5a1e',
         )
 
     ax.set_title('Drift DGP: Preprocessing Effect')
     ax.set_xlabel('Grouped-CV AUC')
     ax.set_yticks(y_pos)
     ax.set_yticklabels(model_order)
-    ax.set_xlim(0.42, 0.71)
-    ax.legend(frameon=True, loc='lower right')
+    ax.tick_params(axis='both', labelsize=FONTSIZE)
+    auc_values = pd.concat([drift_pivot['leak_free'], drift_pivot['episode_norm']])
+    ax.set_xlim(auc_values.min() - 0.06, auc_values.max() + 0.06)
+    ax.margins(y=0.25)
+    ax.legend(frameon=True, loc='lower right', fontsize=FONTSIZE - 1)
 
     plt.tight_layout()
 

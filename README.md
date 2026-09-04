@@ -21,6 +21,7 @@ The current codebase also handles administrative censoring explicitly: censored 
 - `src/leakage_injection.py`: explicit-leak and preprocessing-leak transforms
 - `src/plotting.py`: figure generation
 - `experiments/run_simulation.py`: main benchmark
+- `experiments/run_highsignal_benchmark.py`: higher-signal robustness check (raises episode-effect heterogeneity so grouped-CV AUC is non-trivial)
 - `experiments/run_strengthening_experiments.py`: robustness grid and drift-DGP normalization experiment
 - `scripts/run_benchmark.py`: convenience wrapper for smoke tests and paper-scale reruns
 - `tests/test_censoring_and_grouping.py`: censoring and grouping regression tests
@@ -83,11 +84,21 @@ venv/bin/python experiments/run_simulation.py \
   --output_dir results/protocol_main_30
 ```
 
-Exploratory robustness grid and drift-DGP preprocessing experiment:
+Higher-signal robustness check (raises episode-effect heterogeneity so the grouped-CV baseline is genuinely non-trivial):
+
+```bash
+venv/bin/python experiments/run_highsignal_benchmark.py \
+  --n_replicates 30 \
+  --alpha_std 1.5 \
+  --output_dir results/protocol_main_30
+```
+
+Robustness grid (10 replicates per cell) and drift-DGP preprocessing experiment (30 replicates per model family — the drift estimate is noisy enough at 10 replicates that two of three model families are not clearly distinguishable from zero, so it uses more replicates than the grid):
 
 ```bash
 venv/bin/python experiments/run_strengthening_experiments.py \
-  --n_replicates 2 \
+  --n_replicates 10 \
+  --drift_replicates 30 \
   --episode_grid 20,50,100 \
   --ar_grid 0.0,0.6,0.9 \
   --feature_grid 5,20,100 \
@@ -98,7 +109,7 @@ venv/bin/python experiments/run_strengthening_experiments.py \
 Wrapper for both paper-scale runs:
 
 ```bash
-venv/bin/python scripts/run_benchmark.py --n-reps-main 30 --n-reps-grid 2
+venv/bin/python scripts/run_benchmark.py --n-reps-main 30 --n-reps-grid 10
 ```
 
 The main benchmark writes:

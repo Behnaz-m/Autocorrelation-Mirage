@@ -8,7 +8,7 @@ Smoke test:
     venv/bin/python scripts/run_benchmark.py --smoke-test
 
 Paper-scale runs:
-    venv/bin/python scripts/run_benchmark.py --n-reps-main 30 --n-reps-grid 2
+    venv/bin/python scripts/run_benchmark.py --n-reps-main 30 --n-reps-grid 10 --n-reps-drift 30
 """
 
 from __future__ import annotations
@@ -34,7 +34,8 @@ def main() -> None:
     parser.add_argument("--skip-main", action="store_true")
     parser.add_argument("--skip-strengthening", action="store_true")
     parser.add_argument("--n-reps-main", type=int, default=30)
-    parser.add_argument("--n-reps-grid", type=int, default=2)
+    parser.add_argument("--n-reps-grid", type=int, default=10)
+    parser.add_argument("--n-reps-drift", type=int, default=30)
     parser.add_argument("--delta-bootstrap-reps", type=int, default=500)
     parser.add_argument("--python", type=str, default=str(REPO_ROOT / "venv" / "bin" / "python"))
     args = parser.parse_args()
@@ -44,12 +45,14 @@ def main() -> None:
     if args.smoke_test:
         n_reps_main = 2
         n_reps_grid = 1
+        n_reps_drift = 1
         delta_bootstrap_reps = 100
         main_output = "results/smoke_main"
         strengthening_output = "results/smoke_strengthening"
     else:
         n_reps_main = args.n_reps_main
         n_reps_grid = args.n_reps_grid
+        n_reps_drift = args.n_reps_drift
         delta_bootstrap_reps = args.delta_bootstrap_reps
         main_output = "results/protocol_main_30"
         strengthening_output = "results/strengthening_pooled"
@@ -80,6 +83,8 @@ def main() -> None:
                 "experiments/run_strengthening_experiments.py",
                 "--n_replicates",
                 str(n_reps_grid),
+                "--drift_replicates",
+                str(n_reps_drift),
                 "--episode_grid",
                 "20,50,100",
                 "--ar_grid",
