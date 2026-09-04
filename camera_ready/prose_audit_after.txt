@@ -1,0 +1,12 @@
+
+2-grams: [('grouped auroc', 10), ('is not', 10), ('it is', 8), ('in the', 8), ('and the', 8), ('rather than', 7), ('the robustness', 7), ('rows from', 6), ('logistic regression', 6), ('is the', 6), ('from the', 6), ('the same', 6)]
+
+3-grams: [('the robustness grid', 5), ('from the same', 4), ('the same episode', 4), ('the deployment target', 4), ('each training fold', 4), ('in both training', 3), ('both training and', 3), ('training and test', 3), ('and test folds', 3), ('shared event-time structure', 3), ('strictly causal features', 3), ('for tree ensembles', 3)]
+
+4-grams: [('from the same episode', 4), ('in both training and', 3), ('both training and test', 3), ('episode in both training', 2), ('training and test folds', 2), ('generalization to unseen episodes', 2), ('heterogeneity and shared event-time', 2), ('and shared event-time structure', 2), ('with strictly causal features', 2), ('finds larger gaps for', 2), ('larger gaps for tree', 2), ('gaps for tree ensembles', 2)]
+
+5-grams: [('in both training and test', 3), ('episode in both training and', 2), ('both training and test folds', 2), ('heterogeneity and shared event-time structure', 2), ('finds larger gaps for tree', 2), ('larger gaps for tree ensembles', 2), ('gaps for tree ensembles than', 2), ('from the same episode in', 2), ('when the target is generalization', 2), ('the target is generalization to', 2), ('rows from the same episode', 2), ('fit within each training fold', 2)]
+
+sentence openings: [('to', 2), ('row wise validation', 2), ('full trajectory episode', 2), ('grouped cv', 2), ('over paired replicates', 2)]
+
+content words: [('row-wise', 31), ('episodes', 28), ('grouped', 28), ('episode', 26), ('training', 21), ('leakage', 14), ('validation', 13), ('target', 13), ('effect', 12), ('features', 11), ('deployment', 10), ('replicates', 10), ('future', 10), ('independent', 9), ('information', 9), ('rather', 8), ('explicit', 8), ('normalization', 8), ('dependence', 8), ('generalization', 7), ('random', 7), ('instead', 7), ('mismatch', 7), ('robustness', 7), ('unseen', 6)]

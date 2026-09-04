@@ -1,0 +1,12 @@
+
+2-grams: [('and the', 13), ('rather than', 11), ('is not', 11), ('it is', 8), ('the same', 8), ('in the', 8), ('the main', 8), ('grouped cv', 7), ('and test', 6), ('replicates per', 6), ('random forests', 6), ('main benchmark', 6)]
+
+3-grams: [('for random forests', 5), ('each training fold', 5), ('the main benchmark', 5), ('in both training', 4), ('both training and', 4), ('training and test', 4), ('shared event-time structure', 4), ('the deployment target', 4), ('the robustness grid', 4), ('episode in both', 3), ('and test folds', 3), ('heterogeneity and shared', 3)]
+
+4-grams: [('in both training and', 4), ('both training and test', 4), ('episode in both training', 3), ('heterogeneity and shared event-time', 3), ('and shared event-time structure', 3), ('from the same episode', 3), ('within each training fold', 3), ('training and test folds', 2), ('generalization to unseen episodes', 2), ('latent episode heterogeneity and', 2), ('episode heterogeneity and shared', 2), ('shared event-time structure not', 2)]
+
+5-grams: [('in both training and test', 4), ('episode in both training and', 3), ('heterogeneity and shared event-time structure', 3), ('both training and test folds', 2), ('latent episode heterogeneity and shared', 2), ('episode heterogeneity and shared event-time', 2), ('and shared event-time structure not', 2), ('shared event-time structure not autocorrelation', 2), ('event-time structure not autocorrelation alone', 2), ('structure not autocorrelation alone drive', 2), ('not autocorrelation alone drive the', 2), ('autocorrelation alone drive the effect', 2)]
+
+sentence openings: [('to', 4), ('when row wise', 2), ('row wise validation', 2), ('the main benchmark', 2), ('grouped cv', 2)]
+
+content words: [('row-wise', 38), ('episode', 34), ('episodes', 29), ('grouped', 29), ('training', 22), ('leakage', 17), ('target', 14), ('effect', 13), ('replicates', 13), ('random', 12), ('rather', 12), ('validation', 12), ('features', 11), ('preprocessing', 10), ('within', 10), ('normalization', 10), ('dependence', 10), ('across', 10), ('independent', 9), ('latent', 9), ('paired', 9), ('future', 9), ('pseudoreplication', 9), ('explicit', 9), ('because', 9)]
