@@ -22,11 +22,10 @@
 \title{The Autocorrelation Mirage: Dependence-Aware Evaluation for Panel-Expanded Event Forecasting}
 \titlerunning{Dependence-Aware Evaluation for Panel-Expanded Forecasting}
 
-% Camera-ready author metadata must be supplied by the authors before upload.
-% The repository contains no authoritative affiliations or correspondence details.
-\author{}
-\authorrunning{}
-\institute{}
+\author{Behnaz Moradi-Jamei\inst{1}\thanks{Corresponding author: \texttt{moradibx@jmu.edu}.} \and Ali Tavasoli\inst{1}}
+\authorrunning{B. Moradi-Jamei and A. Tavasoli}
+\institute{Department of Mathematics and Statistics, James Madison University, Harrisonburg, VA 22807, USA\\
+\email{\{moradibx,hqyq4k\}@jmu.edu}}
 
 \maketitle
 
@@ -38,31 +37,15 @@ Panel expansion can turn a small collection of independent episodes into many de
 
 \section{Introduction}
 
-Consider a hospital forecasting which admitted patients risk deterioration within two weeks. Clinicians have followed 30 patients closely enough to have detailed daily vitals -- only 30 independent trajectories, far too few to train a model with one row per patient. A natural workaround expands each stay into one row per day, turning 30 episodes into hundreds of rows and making the pipeline look like an ordinary tabular-classification problem. The same workaround recurs in predictive maintenance, expanding a handful of machine failure histories into daily sensor rows, and in conflict early-warning systems, expanding a few dozen countries into a denser country-month panel~\cite{hegre2019,muchlinski2016}. This workaround -- panel expansion under a small number of truly independent units -- motivates the rest of the paper: does the resulting row count reflect real independent evidence, and does standard cross-validation treat it that way?
+Consider a hospital forecasting deterioration within two weeks from daily vital signs for only 30 patients. Expanding stays into daily rows yields hundreds of records, as in maintenance and conflict forecasting~\cite{hegre2019,muchlinski2016}, but not hundreds of independent trajectories. If deployment is for an unseen patient, row-wise K-fold can place that patient's rows in both training and test sets and answer an interpolation question instead.
 
-Trustworthy AI systems depend not only on model capacity but also on evaluation protocols that match the deployment target. In each of the settings above, the analyst typically has only 20--50 independent episodes and 10--20 features, already a small-data regime by conventional events-per-variable heuristics for generalized linear models~\cite{peduzzi1996,vansmeden2016}, and the expansion into rows does not fix that.
+We call this \textbf{episode memorization}: a flexible model exploits latent episode effects, shared event-time structure, or trajectories represented on both sides of a split rather than transferable signal. It differs from \emph{explicit leakage}, which encodes unavailable future information (e.g., $T_e-t$), and \emph{preprocessing leakage}, which admits test or future observations into a transform. Pseudoreplication is instead an evaluation-unit mismatch and can occur with strictly causal features.
 
-That expansion does not simply increase sample size; it changes the evaluation problem. When row-wise K-Fold cross-validation assigns expanded observations to folds independently, rows from the same episode can appear in both training and test sets. Because consecutive observations $X_{e,t}$ and $X_{e,t+1}$ are autocorrelated, a flexible model can recognize episode-specific trajectory structure rather than infer risk that transfers to unseen episodes. We call this mechanism \textbf{episode memorization}. In that setting, row-wise CV turns a forecasting task (generalizing to new episodes) into a partially interpolative task (matching rows within known episodes).
-
-It is useful to distinguish three failure modes that are often conflated. \emph{Explicit leakage} occurs when a feature directly encodes unavailable future information such as $T_e - t$. \emph{Normalization leakage} occurs when test-fold statistics or future within-episode summaries enter preprocessing even though they would be unavailable at prediction time. \emph{Pseudoreplication} occurs when dependent rows from the same episode are split across training and test folds. The first two are feature- or preprocessing-level violations. The third is an evaluation-design violation and can arise even when every feature is strictly causal.
-
-In our simulation, replacing grouped five-fold evaluation with row-wise \texttt{KFold} increases mean AUC by 0.283, from 0.552 to 0.835. In the same benchmark, an explicit time-to-event leak increases grouped-evaluation AUC by 0.261, from 0.552 to 0.813. We present this comparison as evidence that pseudoreplication can be severe, not as a universal ranking across all domains or models. This finding builds on established work on data leakage, pseudoreplication, and blocked or subject-wise cross-validation, which we review in Section~\ref{sec:related} together with our contribution relative to it.
-
-The paper makes six contributions. First, it clarifies the distinction between explicit leakage, preprocessing leakage, and pseudoreplication in expanded panels. Second, it formalizes episode memorization as the mechanism by which row-wise CV can produce optimistic estimates. Third, it quantifies the resulting optimism in a controlled benchmark with strictly causal features, and shows that the gap persists even in a higher-signal configuration where grouped-CV performance is no longer near chance. Fourth, it stress-tests that optimism over a compact grid of episode counts, dependence levels, dimensionalities, and model families. Fifth, it demonstrates an analogous optimism from preprocessing leakage under a second, drift-based data-generating process. Sixth, it proposes $\DeltaCV$, the gap between row-wise and grouped CV estimates, as a practical warning signal together with a dependence-aware evaluation protocol and an audit checklist.
-
-The goal is methodological rather than epidemiological: we identify a failure mode, explain its mechanism, and quantify its potential impact under controlled conditions. We do not attempt to measure how prevalent this problem is in published practice.
-
-The rest of the paper proceeds as follows: related work (Sec.~\ref{sec:related}); the theoretical framework and three failure modes (Sec.~\ref{sec:theory}); implicit normalization and imputation traps (Sec.~\ref{sec:implicit}); the episode-memorization mechanism and a sibling-overlap result (Sec.~\ref{sec:pseudo}); the empirical benchmark, higher-signal check, robustness grid, and drift experiment (Sec.~\ref{sec:empirical}); the $\DeltaCV$ diagnostic and evaluation protocol (Sec.~\ref{sec:delta-cv-protocol}); scope, limitations, and the audit checklist (Sec.~\ref{sec:discussion}); and conclusions (Sec.~\ref{sec:conclusion}).
+We quantify the mismatch, test it with nontrivial transferable signal, isolate its mechanisms, and contrast it with preprocessing leakage. Our practical diagnostic is $\DeltaCV$, the row-wise minus grouped AUROC. The paper reviews related validation work, specifies the DGP and protocols, presents results, and closes with a deployment-focused checklist. Evidence is simulation-based.
 
 \section{Related Work}\label{sec:related}
 
-\noindent\textbf{Leakage taxonomies.} Kaufman et al.~\cite{kaufman2012} formalized data leakage in i.i.d.\ settings through a learn/predict separation criterion; Section~\ref{sec:theory} extends that criterion to filtrations and adds pseudoreplication as a third failure mode distinct from the explicit and preprocessing leakage that Kapoor and Narayanan~\cite{kapoor2023} found dominate published leakage audits.
-
-\noindent\textbf{Blocked, grouped, and subject-wise cross-validation.} Roberts et al.~\cite{roberts2017} argued for block cross-validation under temporal, spatial, hierarchical, or phylogenetic structure, and de Prado~\cite{prado2018} proposed purged and embargoed cross-validation for overlapping labels in finance, a related but distinct problem (label overlap rather than expanded-row dependence). Hurlbert~\cite{hurlbert1984} coined \emph{pseudoreplication} for non-independent replicates analyzed as if independent, the direct ancestor of our use of the term. Closer to our setting, Saeb et al.~\cite{saeb2017} and Vabalas et al.~\cite{vabalas2019} showed empirically that record-wise cross-validation overstates performance relative to subject-wise validation in clinical and wearable-sensor ML. These studies document the phenomenon within one application each; we instead isolate the mechanism analytically (Section~\ref{sec:pseudo}) and quantify it against a matched explicit-leakage benchmark in event-time panel data.
-
-\noindent\textbf{Panel-expanded conflict forecasting.} Muchlinski et al.~\cite{muchlinski2016} and the ViEWS system~\cite{hegre2019} popularized flexible ML on panel-expanded conflict data, and Cranmer and Desmarais~\cite{cranmer2017} and Neunhoeffer and Sternberg~\cite{neunhoeffer2019} showed that cross-validation misuse can overturn substantive claims in that literature. We share their motivation but contribute a domain-agnostic mechanism and diagnostic rather than a re-analysis of one dataset.
-
-\noindent\textbf{Relative to all of the above,} no prior study isolates pseudoreplication's effect size from explicit and preprocessing leakage under one shared, controlled protocol stress-tested across dependence, episode counts, and model families (Section~\ref{sec:conclusion}).
+Grouped, blocked, and subject-wise validation align the held-out unit with structured deployment~\cite{roberts2017,prado2018}; record-wise evaluation can overstate subject-wise performance in clinical and wearable ML~\cite{saeb2017,vabalas2019}. Hurlbert~\cite{hurlbert1984} termed treating non-independent observations as replicates \emph{pseudoreplication}. Leakage taxonomies distinguish information unavailable at prediction time~\cite{kaufman2012,kapoor2023}, while temporal and panel-forecasting studies show that a splitter can overturn conclusions~\cite{cranmer2017,neunhoeffer2019}. We isolate evaluation-unit mismatch alongside explicit and preprocessing leakage in one controlled event-time DGP.
 
 \section{Theoretical Framework}\label{sec:theory}
 
@@ -135,24 +118,7 @@ Suppose both classes have positive probability and the leaked score has the form
 
 \section{Implicit Violations in Standard Pipelines}\label{sec:implicit}
 
-Table~\ref{tab:failure_modes} summarizes the three failure modes emphasized in this paper. Explicit leakage and normalization leakage are violations of predictability. Pseudoreplication is different: it is an evaluation mismatch induced by splitting dependent rows across folds.
-
-\begin{table}[t]
-\centering
-\caption{Three distinct sources of evaluation optimism in expanded panel forecasting.}\label{tab:failure_modes}
-\small
-\begin{tabularx}{\linewidth}{@{}p{2.6cm}Xp{1.35cm}X@{}}
-\toprule
-\textbf{Failure mode} & \textbf{Mechanism} & \textbf{Future info?} & \textbf{Primary fix} \\
-\midrule
-Explicit leakage & Feature directly reveals a post-$t$ outcome signal such as $T_e - t$ & Yes & Redesign or remove feature \\
-Normalization leakage & Test-fold statistics, future within-episode values, or full-trajectory episode summaries enter transformed inputs & Indirectly & Fit transforms within each training fold; for online use, rely on trailing or historically available statistics \\
-Pseudoreplication & Rows from the same episode appear in both train and test folds & No & Group by episode at split time \\
-\bottomrule
-\end{tabularx}
-\end{table}
-
-Normalization traps are heterogeneous. Simple global standardization $\tilde{X} = (X - \mu)/\sigma$ can be weak when the feature process is approximately stationary, but transforms that use future within-episode values---for example, full-trajectory episode means or episode-wise z-scores---can be much more problematic. Mean imputation uses future observations; episode-mean imputation uses $\bar{X}_e$, which also depends on $T_e$. Centered moving averages use future values by construction. These traps require features with pre-existing trends toward the event. Strictly causal stationary features are often less sensitive, but many real-world variables are not: vital signs may deteriorate before death, equipment diagnostics may worsen before failure, and conflict indicators may escalate before violence.
+Explicit leakage exposes post-$t$ outcome information; preprocessing leakage uses test-fold or future within-episode information; pseudoreplication is an evaluation-unit mismatch that splits an episode across folds. Full-trajectory episode means, episode-wise z-scores, imputation, and centered windows can leak future values; transformations must be fit in each training fold.
 
 \section{Episode Memorization Under Row-Wise Cross-Validation}\label{sec:pseudo}
 
@@ -203,43 +169,7 @@ Explicit Leak + Grouped CV & 0.813 $\pm$ 0.042 & 0.198 $\pm$ 0.041 & +0.261 & [0
 \end{tabular}
 \end{table}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.72\textwidth]{auc_comparison_bars.png}
-\caption{Main benchmark (30 replicates) under matched five-fold protocols. Row-wise KFold increases AUROC and improves Brier score relative to episode-grouped five-fold validation even though the features are strictly causal.}
-\label{fig:simulation}
-\end{figure}
-
-\begin{table}[t]
-\centering
-\caption{Matched-replicate CI for mean $\DeltaCV$, and mean within-replicate episode-bootstrap interval in the 30-replicate main benchmark.}\label{tab:delta-uncertainty}
-\footnotesize
-\begin{tabular}{@{}lcc@{}}
-\toprule
-Summary & $\DeltaCV$ & 95\% interval \\
-\midrule
-Matched replicate mean & 0.283 & [0.246, 0.320] \\
-Mean within-replicate bootstrap & 0.283 & [0.141, 0.413] \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Table~\ref{tab:sim} and Figure~\ref{fig:simulation} reveal the central finding: row-wise cross-validation alone can create substantial optimism. Row-wise KFold yields AUC=0.835 from strictly causal features, an absolute gap of 0.283 over grouped CV (AUC=0.552), with a matched-replicate 95\% interval of [0.246, 0.320]. Episode-weighted summaries point the same way: grouped CV yields episode-weighted AUC=0.547 and episode-mean Brier=0.280, whereas row-wise KFold reaches 0.823 and 0.159. The mean within-replicate episode-bootstrap interval for $\DeltaCV$ is [0.141, 0.413], the median is [0.123, 0.386], and the smallest lower endpoint across replicates is 0.066, so all 30 replicate-level intervals remain positive (Table~\ref{tab:delta-uncertainty}). In this benchmark, explicit $T_e - t$ leakage raises grouped-evaluation AUC by 0.261 with paired 95\% interval [0.236, 0.286]. The training-fold prevalence predictor attains AUC=0.430 and Brier=0.245; because each grouped split predicts the training-fold prevalence for its held-out episodes, its scores vary across folds and need not yield AUC=0.5. Relative to that baseline, grouped boosting improves ranking but worsens Brier (0.330), indicating that grouped CV is near chance in discrimination and poorly calibrated in this small-$E$ setting, whereas row-wise CV hides both problems. For the alternative target of forecasting future rows of already observed episodes, temporal-blocked within-episode validation yields AUC=0.917 and Brier=0.232; because it carries same-episode history into training, it is appropriate for future rows of known episodes rather than unseen-episode generalization. Simple global normalization shows no measurable AUC gap in this stationary DGP, so that row should be read as a conservative baseline rather than as evidence that preprocessing leakage is unimportant. For tree-based learners, simple affine rescaling is also expected to have limited effect; the drift-DGP experiment below provides the positive preprocessing example. The same benchmark still averages only about 68 effective observations despite roughly 587 at-risk rows, underscoring that row expansion does not create independent evidence.
-
-\begin{table}[t]
-\centering
-\caption{Robustness grid: mean $\DeltaCV$ averaged over $E \in \{20,50,100\}$ and $p \in \{5,20,100\}$ (10 replicates per cell).}\label{tab:grid}
-\small
-\begin{tabular}{@{}lccc@{}}
-\toprule
-Model family & $\rho = 0.0$ & $\rho = 0.6$ & $\rho = 0.9$ \\
-\midrule
-Logistic regression & 0.021 & 0.025 & 0.042 \\
-Random forest & 0.125 & 0.144 & 0.175 \\
-Boosted trees & 0.177 & 0.206 & 0.215 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Table~\ref{tab:sim} gives the central result: row-wise KFold yields AUROC 0.835 from strictly causal features versus 0.552 grouped ($\DeltaCV=0.283$, 95\% CI [0.246, 0.320]). Explicit $T_e-t$ leakage raises grouped AUROC by 0.261 [0.236, 0.286]. For future rows of known episodes, temporal-blocked validation yields AUROC 0.917; it is not an unseen-episode estimate because same-episode history remains in training. Global scaling has no effect in this stationary DGP; the drift experiment provides the preprocessing-leakage example.
 
 \begin{table}[t]
 \centering
@@ -274,13 +204,13 @@ Higher signal (episode-effect sd $=1.5$) & 0.723 $\pm$ 0.099 & 0.922 $\pm$ 0.039
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:grid} tests whether the main result is tied to one model or one dimensionality setting, now with ten replicates per cell rather than two. Across 81 $E \times \rho \times p \times$ model cells, higher-capacity tree ensembles exhibit much larger row-wise optimism than logistic regression. Averaged over $E$ and $p$, mean $\DeltaCV$ rises from 0.125 to 0.175 for random forests and from 0.177 to 0.215 for boosted trees as dependence strengthens, while logistic regression stays close to zero (0.021--0.042). Across the 81 cell-level means, logistic-regression gaps range from 0.004 to 0.079 (sd 0.021), random-forest gaps from 0.053 to 0.363 (sd 0.076), and boosted-tree gaps from 0.132 to 0.276 (sd 0.047) -- markedly tighter than the earlier two-replicate version of this grid, though the ordering across model families is unchanged. Varying $p$ up to 100 nuisance features does not remove the effect. Table~\ref{tab:grid-episodes} reports the same gap by episode count instead of dependence: mean $\DeltaCV$ falls somewhat as $E$ grows from 20 to 100 for every model family, consistent with the grouped-CV estimate becoming more stable as more episodes are available, though the tree-ensemble gap remains large even at $E=100$.
+Across the 81 robustness cells (10 paired replicates each), tree ensembles show larger gaps than logistic regression; gaps increase with dependence and remain with nuisance dimensions up to $p=100$. Table~\ref{tab:grid-episodes} shows the episode-count trend: gaps generally fall as $E$ grows, but remain substantial for tree ensembles at $E=100$.
 
 The nonzero gap at $\rho=0$ shows that the effect is not driven by autocorrelation alone. Episode-level latent heterogeneity and shared event-time structure can already create row-wise optimism; increasing autocorrelation strengthens the same evaluation-unit mismatch.
 
 Normalization leakage was tested under a second DGP with a monotone pre-event drift term: $Z_{e,t}$ is replaced by $Z_{e,t} + \text{drift\_strength} \cdot (t/T_{\max})$, $\text{drift\_strength}=1.0$, so every episode's expected latent level rises linearly over its observed span; all other parameters ($E=30$, AR coefficient $0.7$, hazard\_coef $0.15$, episode-effect sd $0.5$, horizon $14$) match the main benchmark. Over 30 replicates per model family, paired by seed, full-trajectory episode-wise normalization raises grouped-CV AUC relative to leak-free inputs by $+0.045$ for logistic regression (95\% CI $[-0.010, 0.100]$), $+0.063$ for random forests (95\% CI $[0.029, 0.096]$), and $+0.034$ for boosted trees (95\% CI $[-0.010, 0.077]$); the random-forest shift is clearly distinguishable from zero, and the other two are borderline, with lower confidence bounds a few thousandths below zero. Global standardization had no measurable effect for any model, as expected for an affine transform. Earlier lightly replicated pilot estimates were considerably noisier and are not reported. Preprocessing leakage here is real, small, and consistently signed, and estimating its size required substantially more replicates than the main pseudoreplication result -- the same caution we ask readers to apply to any single-digit-replicate $\DeltaCV$ estimate.
 
-Figure~\ref{fig:robustness_drift} complements Table~\ref{tab:grid} by making the two supporting patterns visually explicit: larger $\DeltaCV$ values are concentrated in tree-based learners once dependence is moderate or high, and in the drift DGP grouped-CV AUC under full-trajectory episode normalization is higher than under leak-free inputs for every model family, most clearly for random forests.
+Figure~\ref{fig:robustness_drift} shows larger $\DeltaCV$ values for tree-based learners and higher drift-DGP AUROC under full-trajectory normalization, most clearly for random forests.
 
 \begin{figure}[!htbp]
 \centering
@@ -288,6 +218,15 @@ Figure~\ref{fig:robustness_drift} complements Table~\ref{tab:grid} by making the
 \caption{Companion diagnostics for the strengthening experiments. Left: mean $\DeltaCV$ versus dependence after averaging over $E$ and $p$ for each model family. Right: grouped-CV AUC in the drift DGP under leak-free inputs and full-trajectory episode normalization; global standardization overlaps the leak-free baseline and is omitted for clarity.}
 \label{fig:robustness_drift}
 \end{figure}
+
+\paragraph{Mechanism ablation.} We independently set the episode-effect variance ($\sigma_\alpha=0$ versus 0.5) and the AR(1)-to-hazard pathway ($\phi=\beta=0$ versus 0.7 and 0.15). Table~\ref{tab:ablation} reports 30 paired replicates per cell. The gap remains positive even with both switches off, so the factorial design does not support attributing all optimism to either switch alone: shared episode event times and truncation still permit row-wise interpolation. Activating the temporal pathway gives the largest gap (0.285 without, 0.283 with heterogeneity), while heterogeneity alone produces 0.250.
+
+\begin{table}[t]
+\centering
+\caption{Mechanism ablation (30 paired replicates/cell). Temporal state switches the AR(1)-to-hazard pathway; prevalence is reported to show comparable marginals.}\label{tab:ablation}
+\scriptsize
+\input{generated/mechanism_ablation_table.tex}
+\end{table}
 
 \FloatBarrier
 
@@ -314,7 +253,7 @@ In our main benchmark, $\DeltaCV = 0.283$. In the robustness grid, logistic regr
 
 \textbf{Minimal algorithm:} (1)~construct labels only for rows whose $H$-step outcome is observed; (2)~choose the split protocol that matches the deployment target; (3)~fit preprocessing on each training fold only; (4)~fit the model and predict held-out rows; (5)~aggregate pooled and episode-weighted metrics from aligned out-of-fold predictions; and (6)~optionally rerun row-wise KFold and bootstrap episodes to quantify $\DeltaCV$ uncertainty.
 
-\textbf{Specificity and failure modes:} a large positive $\DeltaCV$ is a warning flag, not a proof of episode memorization. Distribution shift between grouped folds, severe fold imbalance, episode heterogeneity, or a mismatch between row-wise interpolation and the true deployment target can also enlarge the gap. Near-zero gaps can likewise be false negatives when dependence is weak or model capacity is limited, as illustrated by the logistic-regression cells in Table~\ref{tab:grid}. Practical warning signs are therefore: large positive $\DeltaCV$; substantial disagreement between row-wise and grouped CV; and unusually strong discrimination despite a very small number of episodes.
+\textbf{Specificity and failure modes:} a large positive $\DeltaCV$ is a warning flag, not proof of episode memorization: distribution shift, fold imbalance, or target mismatch can also enlarge it. Near-zero gaps can be false negatives with weak dependence or limited capacity.
 
 \section{Discussion}\label{sec:discussion}
 
@@ -322,7 +261,7 @@ The main lesson is not that pseudoreplication is always larger than every other 
 
 Row-wise validation is not always invalid. If the deployment target is interpolation within already observed episodes---for example, forecasting future rows for machines, patients, or regions that are already represented in the training history---then a row-wise or temporally blocked within-episode split may estimate a relevant risk. Our critique applies when the target is generalization to new episodes, where the independent sampling unit is the episode rather than the expanded row.
 
-A chronological, temporally blocked split within each episode is a common intuition for "safe" validation, since it never trains on rows chronologically after a test row -- but it protects against only one of the three failure modes in Table~\ref{tab:failure_modes}. In our main benchmark, temporal-blocked within-episode validation reaches AUC~$=0.917$ (Section~\ref{sec:empirical}), far closer to the row-wise memorization figure of $0.835$ than to the grouped, unseen-episode figure of $0.552$. This is expected: temporal blocking still trains on other rows from the \emph{same} episode, letting the model condition on episode identity and history, which unseen-episode generalization rules out. A temporal split is right when the target really is forecasting future rows of already-observed units, but it is not a substitute for episode-grouped validation when the target is new-episode generalization, and "we used a time-based split" is not by itself sufficient evidence against pseudoreplication.
+A chronological split prevents training on later rows but retains the \emph{same} episode in training. Its AUROC is 0.917, closer to row-wise 0.835 than grouped 0.552; it is appropriate for future rows of known units, not unseen episodes.
 
 \begin{table}[t]
 \centering
