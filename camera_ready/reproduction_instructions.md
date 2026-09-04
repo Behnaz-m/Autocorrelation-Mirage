@@ -6,6 +6,7 @@ Run from the repository root with the existing virtual environment:
 venv/bin/python -m unittest discover -s tests -p 'test_*.py'
 venv/bin/python experiments/run_highsignal_benchmark.py --n_replicates 30 --start_seed 42 --alpha_std 1.5 --output_dir results/protocol_main_30
 venv/bin/python experiments/run_strengthening_experiments.py --n_replicates 10 --drift_replicates 30 --output_dir results/strengthening_pooled
+venv/bin/python experiments/run_mechanism_ablation.py --n-replicates 30 --start-seed 42
 latexmk -pdf -halt-on-error -interaction=nonstopmode main2_iberamia.tex
 ```
 

@@ -25,6 +25,6 @@
 
 “Episode Memorization in Panel-Expanded Event Forecasting: Aligning Cross-Validation with the Deployment Unit.” It foregrounds the demonstrated mechanism and deployment mismatch while retaining the accepted title in the manuscript.
 
-## Unresolved issues
+## Final state
 
-Final author metadata is unavailable and the compiled manuscript is 16, not at most 12, pages. These prevent immediate upload.
+Final author metadata is inserted, the source compiles to 12 pages, and the clean archive was compiled successfully. The mechanism ablation adds 30 paired replicates to each of four cells; its results are in `results/camera_ready/mechanism_ablation.csv`.
